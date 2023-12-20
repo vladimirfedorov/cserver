@@ -8,6 +8,10 @@ The idea is to build a web server in C that:
 
 Header files are located in `` `xcrun --show-sdk-path`/usr/include `` in macOS.
 
+### Links
+
+- [HTTP response status codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+
 ### Make
 
 ```
