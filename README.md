@@ -7,3 +7,15 @@ The idea is to build a web server in C that:
 - [ ] Runs Lua scripts.
 
 Header files are located in `` `xcrun --show-sdk-path`/usr/include `` in macOS.
+
+### Make
+
+```
+make cserver
+```
+
+### Run
+
+```
+./cserver
+```
