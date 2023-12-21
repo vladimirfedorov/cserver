@@ -2,25 +2,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-char* make_response(char *response, int status_code, char *status_message, char *content_type, char *content);
+char* make_response(int status_code, char *status_message, char *content_type, char *content);
 
 int main(int argc, char **argv) {
 	char *response;
     
     // 1
-	response = make_response(response, 200, "OK", "plain/text", "Hello there!");
+	response = make_response(200, "OK", "plain/text", "Hello there!");
 	printf("----\n%s\n----\n", response);
     free(response);
     
     // 2 
-	response = make_response(response, 500, "Internal Server Error", "application/json", "{ \"message\": \"Hello there!\" }");
+	response = make_response(500, "Internal Server Error", "application/json", "{ \"message\": \"Hello there!\" }");
 	printf("----\n%s\n----\n", response);
 	free(response);
 	
     exit(0);
 }
 
-char* make_response(char *buffer, int status_code, char *status_message, char *content_type, char *content) {
+char* make_response(int status_code, char *status_message, char *content_type, char *content) {
     // Calculate the lengths of various parts of the HTTP response
     // CRLF is the standard line break (https://www.w3.org/MarkUp/html-spec/html-spec_8.html#SEC8.2.1)
     int content_length = strlen(content);
