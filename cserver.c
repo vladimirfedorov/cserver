@@ -7,6 +7,18 @@
 
 #define PORT 8080
 
+/**
+ * Generates an HTTP response string.
+ *
+ * @param status_code    The HTTP status code to include in the response.
+ * @param status_message The custom status message to include in the response.
+ * @param content_type   The Content-Type header for the response.
+ * @param content        The content to include in the response body.
+ *
+ * @return A pointer to the dynamically allocated HTTP response string.
+ *         The caller is responsible for freeing the allocated memory using free().
+ *         Returns NULL if memory allocation fails.
+ */
 char* make_response(int status_code, char *status_message, char *content_type, char *content);
 
 int main(int argc, char **argv) {
@@ -82,6 +94,18 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/**
+ * Generates an HTTP response string.
+ *
+ * @param status_code    HTTP status code.
+ * @param status_message HTTP status message.
+ * @param content_type   The "Content-Type" header for the response.
+ * @param content        The content to include in the response body.
+ *
+ * @return A pointer to the dynamically allocated HTTP response string.
+ *         The caller is responsible for freeing the allocated memory using free().
+ *         Returns NULL if memory allocation fails.
+ */
 char* make_response(int status_code, char *status_message, char *content_type, char *content) {
     // Calculate the lengths of various parts of the HTTP response
     // CRLF is the standard line break (https://www.w3.org/MarkUp/html-spec/html-spec_8.html#SEC8.2.1)
