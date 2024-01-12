@@ -10,9 +10,9 @@
 /**
  * Generates an HTTP response string.
  *
- * @param status_code    The HTTP status code to include in the response.
- * @param status_message The custom status message to include in the response.
- * @param content_type   The Content-Type header for the response.
+ * @param status_code    HTTP status code.
+ * @param status_message HTTP status message.
+ * @param content_type   The "Content-Type" header for the response.
  * @param content        The content to include in the response body.
  *
  * @return A pointer to the dynamically allocated HTTP response string.
