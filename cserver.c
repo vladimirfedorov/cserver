@@ -4,8 +4,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <fcntl.h>
 
+// Default port number
 #define PORT 8080
+// Default folder for static files
+#define STATIC_FOLDER "static"
 
 /**
  * Generates an HTTP response string.
@@ -20,6 +24,18 @@
  *         Returns NULL if memory allocation fails.
  */
 char* make_response(int status_code, char *status_message, char *content_type, char *content);
+
+/**
+ * Serves static files to the client over a socket connection.
+ *
+ * @param socket    The socket descriptor for the client connection.
+ * @param filename  The name of the file to be served from the 'static' folder.
+ *
+ * @note Sends an HTTP response header followed by the content of the file.
+ *       - sends a 200 OK response and the file's contents if the file exists in the 'static' folder,
+ *       - sends a 404 Not Found response if the file does not exist.
+ */
+void serve_file(int socket, char *filename);
 
 int main(int argc, char **argv) {
 
@@ -78,14 +94,17 @@ int main(int argc, char **argv) {
 		char url[url_len];
 		sscanf(buffer, "%s %s", method, url);
 		printf("Method: %s\nURL: %s\n", method, url);
+        char path[url_len];
+        snprintf(path, sizeof(path), "%s/%s", STATIC_FOLDER, url);
+        serve_file(socket_desc, path);
 
 		// Send the response
-        char *response = make_response(200, "OK", "text/plain", "Hello!");
-		int send_result = send(socket_desc, response, strlen(response), 0);
-        if (send_result < 0) {
-            perror("send failed.");
-            exit(EXIT_FAILURE);
-        }
+        // char *response = make_response(200, "OK", "text/plain", "Hello!");
+		// int send_result = send(socket_desc, response, strlen(response), 0);
+        // if (send_result < 0) {
+        //     perror("send failed.");
+        //     exit(EXIT_FAILURE);
+        // }
 
         // Close the connection
         close(socket_desc);
@@ -142,4 +161,40 @@ char* make_response(int status_code, char *status_message, char *content_type, c
     strcat(response, content);
 
     return response;
+}
+
+/**
+ * Serves static files to the client over a socket connection.
+ *
+ * @param socket    The socket descriptor for the client connection.
+ * @param filename  The name of the file to be served from the 'static' folder.
+ *
+ * @note Sends an HTTP response header followed by the content of the file.
+ *       - sends a 200 OK response and the file's contents if the file exists in the 'static' folder,
+ *       - sends a 404 Not Found response if the file does not exist.
+ */
+void serve_file(int socket, char *filename) {
+    char response_header[1024];
+    char buffer[1024];
+    ssize_t bytes_read;
+    int file_fd;
+
+    // Open the requested file
+    file_fd = open(filename, O_RDONLY);
+
+    if (file_fd == -1) {
+        // If the file doesn't exist, return a 404 response
+        snprintf(response_header, sizeof(response_header), "HTTP/1.1 404 Not Found\r\n\r\n");
+        send(socket, response_header, strlen(response_header), 0);
+    } else {
+        // If the file exists, send a 200 OK response and the file's contents
+        snprintf(response_header, sizeof(response_header), "HTTP/1.1 200 OK\r\n\r\n");
+        send(socket, response_header, strlen(response_header), 0);
+
+        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+            send(socket, buffer, bytes_read, 0);
+        }
+
+        close(file_fd);
+    }
 }
