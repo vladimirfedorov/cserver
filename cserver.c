@@ -25,6 +25,8 @@
  */
 char* make_response(int status_code, char *status_message, char *content_type, char *content);
 
+char* render_md(char *md_content, size_t md_length);
+
 /**
  * Serves static files to the client over a socket connection.
  *
@@ -191,10 +193,36 @@ void serve_file(int socket, char *filename) {
         snprintf(response_header, sizeof(response_header), "HTTP/1.1 200 OK\r\n\r\n");
         send(socket, response_header, strlen(response_header), 0);
 
-        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
-            send(socket, buffer, bytes_read, 0);
-        }
+        if (strlen(filename) >= 3 && strcmp(filename + strlen(filename) - 3, ".md") == 0) {
+            // Render markdown file
+            char* markdown_content = NULL;
+            size_t markdown_length = 0;
 
+            while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+                markdown_content = realloc(markdown_content, markdown_length + bytes_read + 1);
+                memcpy(markdown_content + markdown_length, buffer, bytes_read);
+                markdown_length += bytes_read;
+            }
+
+            markdown_content[markdown_length] = '\0';
+
+            char* html_content = render_md(markdown_content, markdown_length);
+            send(socket, html_content, strlen(html_content), 0);
+            free(html_content);
+            free(markdown_content);
+        } else {
+            // Send raw file data
+            while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+                send(socket, buffer, bytes_read, 0);
+            }
+        }
         close(file_fd);
     }
+}
+
+char* render_md(char *md_content, size_t md_length) {
+    printf("Markdown %lu bytes:\n%s", md_length, md_content);
+    char* html_content = malloc(md_length);
+    strcpy(html_content, md_content);
+    return  html_content;
 }
