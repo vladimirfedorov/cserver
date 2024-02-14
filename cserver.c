@@ -6,6 +6,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+// Markdown
+
+#include "md4c/src/md4c-html.h"
+
 // Default port number
 #define PORT 8080
 // Default folder for static files
@@ -207,6 +211,8 @@ void serve_file(int socket, char *filename) {
             markdown_content[markdown_length] = '\0';
 
             char* html_content = render_md(markdown_content, markdown_length);
+            size_t html_length = strlen(html_content);
+            send(socket, "<!DOCTYPE html>", 15, 0);
             send(socket, html_content, strlen(html_content), 0);
             free(html_content);
             free(markdown_content);
@@ -220,8 +226,41 @@ void serve_file(int socket, char *filename) {
     }
 }
 
+// Markdown renderer
+
+typedef struct {
+    char *output;
+    size_t size;
+} html_buffer;
+
+// Callback function to append the output HTML
+void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
+    html_buffer *buf = (html_buffer *)userdata;
+    char *new_output = realloc(buf->output, buf->size + size + 1); // +1 for null terminator
+    if (!new_output) {
+        // Handle allocation failure
+        return;
+    }
+    memcpy(new_output + buf->size, text, size); // Append new HTML fragment
+    buf->output = new_output;
+    buf->size += size;
+    buf->output[buf->size] = '\0'; // Ensure null-termination
+}
+
 char* render_md(char *md_content, size_t md_length) {
     printf("Markdown %lu bytes:\n%s", md_length, md_content);
+
+    html_buffer buf = {0};
+
+    // Parse Markdown to HTML
+    if (md_html(md_content, md_length, output_callback, &buf, 0, 0) != 0) {
+        // Handle parsing error
+        free(buf.output);
+        return NULL;
+    }
+
+    return buf.output; // Return the HTML output
+
     char* html_content = malloc(md_length);
     strcpy(html_content, md_content);
     return  html_content;
