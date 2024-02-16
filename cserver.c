@@ -260,8 +260,4 @@ char* render_md(char *md_content, size_t md_length) {
     }
 
     return buf.output; // Return the HTML output
-
-    char* html_content = malloc(md_length);
-    strcpy(html_content, md_content);
-    return  html_content;
 }
