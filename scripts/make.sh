@@ -1,7 +1,6 @@
 #!/bin/sh
-rm -rf md4c
-git clone https://github.com/mity/md4c.git
-rm -rf mustach
-git clone https://gitlab.com/jobol/mustach.git
+if [ ! -d "md4c" ] || [ ! -d "mustach" ]; then
+    ./scripts/init.sh
+fi
 make
 make clean
