@@ -1,5 +1,5 @@
 #!/bin/sh
 rm -rf md4c
-git clone git@github.com:mity/md4c.git md4c
+git clone https://github.com/mity/md4c.git
 make
 make clean
