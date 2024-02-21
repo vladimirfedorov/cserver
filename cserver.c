@@ -7,8 +7,11 @@
 #include <fcntl.h>
 
 // Markdown
-
 #include "md4c/src/md4c-html.h"
+
+// Templates
+
+#include "mustach/mustach.h"
 
 // Default port number
 #define PORT 8080
@@ -30,6 +33,8 @@
 char* make_response(int status_code, char *status_message, char *content_type, char *content);
 
 char* render_md(char *md_content, size_t md_length);
+
+char* render_mustache(char *template_content, size_t template_length);
 
 /**
  * Serves static files to the client over a socket connection.
@@ -216,6 +221,23 @@ void serve_file(int socket, char *filename) {
             send(socket, html_content, strlen(html_content), 0);
             free(html_content);
             free(markdown_content);
+        } else if (strlen(filename) >= 9 && strcmp(filename + strlen(filename) - 9, ".mustache") == 0) {
+            // Render mustach file
+            char* template_content = NULL;
+            size_t template_length = 0;
+
+            while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+                template_content = realloc(template_content, template_length + bytes_read + 1);
+                memcpy(template_content + template_length, buffer, bytes_read);
+                template_length += bytes_read;
+            }
+
+            template_content[template_length] = '\0';
+
+            char *html_content = render_mustache(template_content, template_length);
+            send(socket, html_content, strlen(html_content), 0);
+            free(html_content);
+            free(template_content);
         } else {
             // Send raw file data
             while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
@@ -260,4 +282,11 @@ char* render_md(char *md_content, size_t md_length) {
     }
 
     return buf.output; // Return the HTML output
+}
+
+char* render_mustache(char *template_content, size_t template_length) {
+    printf("Temaplte %lu bytes:\n%s", template_length, template_content);
+    char* html_content = malloc(template_length);
+    strcpy(html_content, template_content);
+    return  html_content;
 }
