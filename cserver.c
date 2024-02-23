@@ -219,8 +219,8 @@ void serve_file(int socket, char *filename) {
             size_t html_length = strlen(html_content);
             send(socket, "<!DOCTYPE html>", 15, 0);
             send(socket, html_content, strlen(html_content), 0);
-            free(html_content);
-            free(markdown_content);
+            if (html_content) free(html_content);
+            if (markdown_content) free(markdown_content);
         } else if (strlen(filename) >= 9 && strcmp(filename + strlen(filename) - 9, ".mustache") == 0) {
             // Render mustach file
             char* template_content = NULL;
@@ -236,8 +236,8 @@ void serve_file(int socket, char *filename) {
 
             char *html_content = render_mustache(template_content, template_length);
             send(socket, html_content, strlen(html_content), 0);
-            free(html_content);
-            free(template_content);
+            if (html_content) free(html_content);
+            if (template_content) free(template_content);
         } else {
             // Send raw file data
             while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
@@ -277,7 +277,7 @@ char* render_md(char *md_content, size_t md_length) {
     // Parse Markdown to HTML
     if (md_html(md_content, md_length, output_callback, &buf, 0, 0) != 0) {
         // Handle parsing error
-        free(buf.output);
+        if (buf.output) free(buf.output);
         return NULL;
     }
 
