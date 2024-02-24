@@ -70,12 +70,17 @@ int main(int argc, char **argv) {
     socklen_t address_len = sizeof(address);
 
     // Bind the socket to the network address and port
-    bind(server_desc, (struct sockaddr *)&address, address_len);
+    int bind_result = bind(server_desc, (struct sockaddr *)&address, address_len);
+    if (bind_result != 0) {
+        perror("bind failed");
+        return 1;
+    }
 
     // Listen for connections
     int listen_result = listen(server_desc, 3);
-    if (listen_result < 0) {
-        perror("listen failed\n");
+    if (listen_result != 0) {
+        perror("listen failed");
+        return 1;
     }
 
     while (1) {
@@ -84,7 +89,7 @@ int main(int argc, char **argv) {
         // Accept a connection
         int socket_desc = accept(server_desc, (struct sockaddr *)&address, &address_len);
         if (socket_desc < 0) {
-            perror("accept failed.\n");
+            perror("accept failed");
             exit(EXIT_FAILURE);
         }
 
@@ -92,7 +97,7 @@ int main(int argc, char **argv) {
         char buffer[buffer_len] = {0};
 		long recv_result = recv(socket_desc, buffer, buffer_len, 0);
         if (recv_result < 0) {
-            perror("recv failed.\n");
+            perror("recv failed");
             exit(EXIT_FAILURE);
         }
         printf("%li bytes received\n", recv_result);
@@ -151,7 +156,6 @@ char* make_response(int status_code, char *status_message, char *content_type, c
     // Allocate memory for the complete HTTP response
     char *response = (char*)malloc(total_length);
     if (response == NULL) {
-        // Handle allocation failure
         return NULL;
     }
 
