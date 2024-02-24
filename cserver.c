@@ -255,6 +255,14 @@ typedef struct {
     size_t size;
 } html_buffer;
 
+// typedef struct {
+//     struct kore_json_item   *context;
+//     struct kore_buf         *result;
+//     int                     flags;
+//     int                     depth;
+//     struct stack            stack[MUSTACH_MAX_DEPTH];
+// } closure;
+
 // Callback function to append the output HTML
 void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
     html_buffer *buf = (html_buffer *)userdata;
@@ -284,9 +292,63 @@ char* render_md(char *md_content, size_t md_length) {
     return buf.output; // Return the HTML output
 }
 
+// This function is a callback used by mustach to fetch the values of variables
+int mustach_get(void* closure, const char* name, struct mustach_sbuf* sbuf) {
+    return 0;
+}
+
+int mustach_put(void* closure, const char* name, int enter, FILE* file) {
+    fprintf(file, "Hello there variable: %s ", name);
+    return 1;
+}
+
+int mustach_enter(void *closure, const char *name) {
+    return 0;
+}
+
+int mustach_next(void *closure) {
+    return 0;
+}
+
+// Callback for leaving a section or list
+int mustach_leave(void *closure) {
+    return 0;
+}
+
 char* render_mustache(char *template_content, size_t template_length) {
     printf("Temaplte %lu bytes:\n%s", template_length, template_content);
-    char* html_content = malloc(template_length);
-    strcpy(html_content, template_content);
-    return  html_content;
+
+
+ // Prepare the mustach extension and wrap callbacks for variable resolution
+    struct mustach_itf itf = { 
+        .enter = mustach_enter,
+        .next = mustach_next,
+        .leave = mustach_leave,
+        .get = mustach_get, 
+        .put = mustach_put
+    };
+
+    // Render the template into a dynamic string (buffer growing as needed)
+    char* output = NULL;
+    size_t output_size = 0;
+    FILE* output_stream = open_memstream(&output, &output_size);
+
+    // Perform the mustach processing
+    printf("Rendering template...\n");
+    int ret = mustach_file(template_content, template_length, &itf, NULL, Mustach_With_AllExtensions,  output_stream);
+    printf("ret: %i\n", ret);
+    // fwrite(template_content, template_length, 1, output_stream);
+    fflush(output_stream);
+    fclose(output_stream);
+
+    // Check for errors in mustach processing
+    if (ret != MUSTACH_OK) {
+        fprintf(stderr, "Mustach processing error: %d\n", ret);
+        if (output) free(output);
+        return template_content;
+    }
+
+    // char* html_content = malloc(template_length);
+    // strcpy(html_content, template_content);
+    return  output;
 }
