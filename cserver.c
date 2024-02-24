@@ -255,14 +255,6 @@ typedef struct {
     size_t size;
 } html_buffer;
 
-// typedef struct {
-//     struct kore_json_item   *context;
-//     struct kore_buf         *result;
-//     int                     flags;
-//     int                     depth;
-//     struct stack            stack[MUSTACH_MAX_DEPTH];
-// } closure;
-
 // Callback function to append the output HTML
 void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
     html_buffer *buf = (html_buffer *)userdata;
@@ -292,7 +284,6 @@ char* render_md(char *md_content, size_t md_length) {
     return buf.output; // Return the HTML output
 }
 
-// This function is a callback used by mustach to fetch the values of variables
 int mustach_get(void* closure, const char* name, struct mustach_sbuf* sbuf) {
     return 0;
 }
@@ -310,7 +301,6 @@ int mustach_next(void *closure) {
     return 0;
 }
 
-// Callback for leaving a section or list
 int mustach_leave(void *closure) {
     return 0;
 }
@@ -318,8 +308,7 @@ int mustach_leave(void *closure) {
 char* render_mustache(char *template_content, size_t template_length) {
     printf("Temaplte %lu bytes:\n%s", template_length, template_content);
 
-
- // Prepare the mustach extension and wrap callbacks for variable resolution
+     // Prepare the mustach extension and wrap callbacks for variable resolution
     struct mustach_itf itf = { 
         .enter = mustach_enter,
         .next = mustach_next,
@@ -336,8 +325,6 @@ char* render_mustache(char *template_content, size_t template_length) {
     // Perform the mustach processing
     printf("Rendering template...\n");
     int ret = mustach_file(template_content, template_length, &itf, NULL, Mustach_With_AllExtensions,  output_stream);
-    printf("ret: %i\n", ret);
-    // fwrite(template_content, template_length, 1, output_stream);
     fflush(output_stream);
     fclose(output_stream);
 
@@ -348,7 +335,5 @@ char* render_mustache(char *template_content, size_t template_length) {
         return template_content;
     }
 
-    // char* html_content = malloc(template_length);
-    // strcpy(html_content, template_content);
     return  output;
 }
