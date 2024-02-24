@@ -10,7 +10,6 @@
 #include "md4c/src/md4c-html.h"
 
 // Templates
-
 #include "mustach/mustach.h"
 
 // Default port number
