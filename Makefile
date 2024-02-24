@@ -1,4 +1,4 @@
-objects = cserver.o md4c.o md4c-html.o entity.o
+objects = cserver.o md4c.o md4c-html.o entity.o mustach.o
 
 cserver: $(objects)
 	cc -o cserver $(objects)
@@ -11,6 +11,9 @@ md4c-html.o: md4c/src/md4c-html.c
 
 entity.o: md4c/src/entity.c
 	cc -c md4c/src/entity.c
+
+mustach.o: mustach/mustach.c
+	cc -c mustach/mustach.c
 
 .PHONY : clean
 clean :
