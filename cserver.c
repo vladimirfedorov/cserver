@@ -10,7 +10,8 @@
 #include "md4c/src/md4c-html.h"
 
 // Templates
-#include "mustach/mustach.h"
+#include "cjson/cJSON.h"
+#include "mustach/mustach-cjson.h"
 
 // Default port number
 #define PORT 8080
