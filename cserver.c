@@ -312,15 +312,6 @@ int mustach_leave(void *closure) {
 char* render_mustache(char *template_content, size_t template_length) {
     printf("Temaplte %lu bytes:\n%s", template_length, template_content);
 
-     // Prepare the mustach extension and wrap callbacks for variable resolution
-    // struct mustach_itf itf = { 
-    //     .enter = mustach_enter,
-    //     .next = mustach_next,
-    //     .leave = mustach_leave,
-    //     .get = mustach_get, 
-    //     .put = mustach_put
-    // };
-
     cJSON *root = cJSON_Parse("{\"content\": \"<b>Hello</b> there!\"}");
 
     // Render the template into a dynamic string (buffer growing as needed)
@@ -330,7 +321,6 @@ char* render_mustache(char *template_content, size_t template_length) {
 
     // Perform the mustach processing
     printf("Rendering template...\n");
-    // int ret = mustach_file(template_content, template_length, &itf, NULL, Mustach_With_AllExtensions,  output_stream);
     int ret = mustach_cJSON_file(template_content, template_length, root, Mustach_With_AllExtensions, output_stream);
     fflush(output_stream);
     fclose(output_stream);
