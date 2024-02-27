@@ -288,27 +288,6 @@ char* render_md(char *md_content, size_t md_length) {
     return buf.output; // Return the HTML output
 }
 
-int mustach_get(void* closure, const char* name, struct mustach_sbuf* sbuf) {
-    return 0;
-}
-
-int mustach_put(void* closure, const char* name, int enter, FILE* file) {
-    fprintf(file, "Hello there variable: %s ", name);
-    return 1;
-}
-
-int mustach_enter(void *closure, const char *name) {
-    return 0;
-}
-
-int mustach_next(void *closure) {
-    return 0;
-}
-
-int mustach_leave(void *closure) {
-    return 0;
-}
-
 char* render_mustache(char *template_content, size_t template_length) {
     printf("Temaplte %lu bytes:\n%s", template_length, template_content);
 
