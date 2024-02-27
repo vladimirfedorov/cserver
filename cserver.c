@@ -14,7 +14,7 @@
 #include "mustach/mustach-cjson.h"
 
 // Default port number
-#define PORT 8080
+#define PORT 3000
 // Default folder for static files
 #define STATIC_FOLDER "static"
 
