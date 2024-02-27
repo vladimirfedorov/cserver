@@ -335,6 +335,8 @@ char* render_mustache(char *template_content, size_t template_length) {
     fflush(output_stream);
     fclose(output_stream);
 
+    free(root);
+
     // Check for errors in mustach processing
     if (ret != MUSTACH_OK) {
         fprintf(stderr, "Mustach processing error: %d\n", ret);
