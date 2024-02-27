@@ -313,13 +313,13 @@ char* render_mustache(char *template_content, size_t template_length) {
     printf("Temaplte %lu bytes:\n%s", template_length, template_content);
 
      // Prepare the mustach extension and wrap callbacks for variable resolution
-    struct mustach_itf itf = { 
-        .enter = mustach_enter,
-        .next = mustach_next,
-        .leave = mustach_leave,
-        .get = mustach_get, 
-        .put = mustach_put
-    };
+    // struct mustach_itf itf = { 
+    //     .enter = mustach_enter,
+    //     .next = mustach_next,
+    //     .leave = mustach_leave,
+    //     .get = mustach_get, 
+    //     .put = mustach_put
+    // };
 
     cJSON *root = cJSON_Parse("{content: \"Hello there!\"}");
 
