@@ -321,7 +321,7 @@ char* render_mustache(char *template_content, size_t template_length) {
     //     .put = mustach_put
     // };
 
-    cJSON *root = cJSON_Parse("{content: \"Hello there!\"}");
+    cJSON *root = cJSON_Parse("{\"content\": \"<b>Hello</b> there!\"}");
 
     // Render the template into a dynamic string (buffer growing as needed)
     char* output = NULL;
