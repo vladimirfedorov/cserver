@@ -7,11 +7,14 @@
 #include <fcntl.h>
 
 // Markdown
-
 #include "md4c/src/md4c-html.h"
 
+// Templates
+#include "cjson/cJSON.h"
+#include "mustach/mustach-cjson.h"
+
 // Default port number
-#define PORT 8080
+#define PORT 3000
 // Default folder for static files
 #define STATIC_FOLDER "static"
 
@@ -30,6 +33,8 @@
 char* make_response(int status_code, char *status_message, char *content_type, char *content);
 
 char* render_md(char *md_content, size_t md_length);
+
+char* render_mustache(char *template_content, size_t template_length);
 
 /**
  * Serves static files to the client over a socket connection.
@@ -65,12 +70,17 @@ int main(int argc, char **argv) {
     socklen_t address_len = sizeof(address);
 
     // Bind the socket to the network address and port
-    bind(server_desc, (struct sockaddr *)&address, address_len);
+    int bind_result = bind(server_desc, (struct sockaddr *)&address, address_len);
+    if (bind_result != 0) {
+        perror("bind failed");
+        return 1;
+    }
 
     // Listen for connections
     int listen_result = listen(server_desc, 3);
-    if (listen_result < 0) {
-        perror("listen failed\n");
+    if (listen_result != 0) {
+        perror("listen failed");
+        return 1;
     }
 
     while (1) {
@@ -79,7 +89,7 @@ int main(int argc, char **argv) {
         // Accept a connection
         int socket_desc = accept(server_desc, (struct sockaddr *)&address, &address_len);
         if (socket_desc < 0) {
-            perror("accept failed.\n");
+            perror("accept failed");
             exit(EXIT_FAILURE);
         }
 
@@ -87,7 +97,7 @@ int main(int argc, char **argv) {
         char buffer[buffer_len] = {0};
 		long recv_result = recv(socket_desc, buffer, buffer_len, 0);
         if (recv_result < 0) {
-            perror("recv failed.\n");
+            perror("recv failed");
             exit(EXIT_FAILURE);
         }
         printf("%li bytes received\n", recv_result);
@@ -146,7 +156,6 @@ char* make_response(int status_code, char *status_message, char *content_type, c
     // Allocate memory for the complete HTTP response
     char *response = (char*)malloc(total_length);
     if (response == NULL) {
-        // Handle allocation failure
         return NULL;
     }
 
@@ -214,8 +223,25 @@ void serve_file(int socket, char *filename) {
             size_t html_length = strlen(html_content);
             send(socket, "<!DOCTYPE html>", 15, 0);
             send(socket, html_content, strlen(html_content), 0);
-            free(html_content);
-            free(markdown_content);
+            if (html_content) free(html_content);
+            if (markdown_content) free(markdown_content);
+        } else if (strlen(filename) >= 9 && strcmp(filename + strlen(filename) - 9, ".mustache") == 0) {
+            // Render mustach file
+            char* template_content = NULL;
+            size_t template_length = 0;
+
+            while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+                template_content = realloc(template_content, template_length + bytes_read + 1);
+                memcpy(template_content + template_length, buffer, bytes_read);
+                template_length += bytes_read;
+            }
+
+            template_content[template_length] = '\0';
+
+            char *html_content = render_mustache(template_content, template_length);
+            send(socket, html_content, strlen(html_content), 0);
+            if (html_content) free(html_content);
+            if (template_content) free(template_content);
         } else {
             // Send raw file data
             while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
@@ -255,9 +281,37 @@ char* render_md(char *md_content, size_t md_length) {
     // Parse Markdown to HTML
     if (md_html(md_content, md_length, output_callback, &buf, 0, 0) != 0) {
         // Handle parsing error
-        free(buf.output);
+        if (buf.output) free(buf.output);
         return NULL;
     }
 
     return buf.output; // Return the HTML output
+}
+
+char* render_mustache(char *template_content, size_t template_length) {
+    printf("Temaplte %lu bytes:\n%s", template_length, template_content);
+
+    cJSON *root = cJSON_Parse("{\"content\": \"<b>Hello</b> there!\"}");
+
+    // Render the template into a dynamic string (buffer growing as needed)
+    char* output = NULL;
+    size_t output_size = 0;
+    FILE* output_stream = open_memstream(&output, &output_size);
+
+    // Perform the mustach processing
+    printf("Rendering template...\n");
+    int ret = mustach_cJSON_file(template_content, template_length, root, Mustach_With_AllExtensions, output_stream);
+    fflush(output_stream);
+    fclose(output_stream);
+
+    free(root);
+
+    // Check for errors in mustach processing
+    if (ret != MUSTACH_OK) {
+        fprintf(stderr, "Mustach processing error: %d\n", ret);
+        if (output) free(output);
+        return template_content;
+    }
+
+    return  output;
 }
