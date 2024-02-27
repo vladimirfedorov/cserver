@@ -321,6 +321,8 @@ char* render_mustache(char *template_content, size_t template_length) {
         .put = mustach_put
     };
 
+    cJSON *root = cJSON_Parse("{content: \"Hello there!\"}");
+
     // Render the template into a dynamic string (buffer growing as needed)
     char* output = NULL;
     size_t output_size = 0;
@@ -328,7 +330,8 @@ char* render_mustache(char *template_content, size_t template_length) {
 
     // Perform the mustach processing
     printf("Rendering template...\n");
-    int ret = mustach_file(template_content, template_length, &itf, NULL, Mustach_With_AllExtensions,  output_stream);
+    // int ret = mustach_file(template_content, template_length, &itf, NULL, Mustach_With_AllExtensions,  output_stream);
+    int ret = mustach_cJSON_file(template_content, template_length, root, Mustach_With_AllExtensions, output_stream);
     fflush(output_stream);
     fclose(output_stream);
 
