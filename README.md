@@ -32,4 +32,4 @@ Header files are located in `` `xcrun --show-sdk-path`/usr/include `` in macOS.
 ./cserver
 ```
 
-The server listens to 8080, this port number is hardcoded in `cserver.c` at the moment.
+The server listens to 3000, this port number is hardcoded in `cserver.c` at the moment.
