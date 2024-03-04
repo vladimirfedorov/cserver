@@ -8,6 +8,8 @@ The idea is to build a web server in C that:
 	- [x] Templates (mustach)
 	- [ ] Render pages / index files in folders
 	      `/path/to/page`  can be a page.md file, page.html file, page/ folder with index.md or index.html file.
+	- [ ] Categories based on pages metadata
+	- [ ] Atom feeds
 - [ ] Runs Lua scripts.
 
 Ideally, the server should be able to serve static files in the `static` folder, transform Markdown files to html pages using templates in the `templates` folder, and create RSS feed(s) for categories in markdow files' header metadata. Each rendered page should be cached and kept cached until the server restarts or one of website files changes.
