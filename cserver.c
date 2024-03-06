@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -17,6 +18,9 @@
 #define PORT 3000
 // Default folder for static files
 #define STATIC_FOLDER "static"
+// Max path length
+#define MAX_PATH_LEN 4096
+
 
 /**
  * Generates an HTTP response string.
@@ -47,6 +51,10 @@ char* render_mustache(char *template_content, size_t template_length);
  *       - sends a 404 Not Found response if the file does not exist.
  */
 void serve_file(int socket, char *filename);
+
+char* resource_path(char *request_path);
+
+cJSON* make_context();
 
 int main(int argc, char **argv) {
 
@@ -110,9 +118,21 @@ int main(int argc, char **argv) {
 		char url[url_len];
 		sscanf(buffer, "%s %s", method, url);
 		printf("Method: %s\nURL: %s\n", method, url);
-        char path[url_len];
-        snprintf(path, sizeof(path), "%s/%s", STATIC_FOLDER, url);
-        serve_file(socket_desc, path);
+        char filename[url_len];
+        char *path = resource_path(url);
+        // snprintf(filename, sizeof(filename), "%s/%s", STATIC_FOLDER, path);
+        if (path != NULL) {
+            printf("200 OK\n- request_path: %s\n- resource_path: %s\n", url, path);
+            serve_file(socket_desc, path);
+        } else {
+            printf("404 Not found\n- request_path: %s\n- resource_path: %s\n", url, path);
+            char *response = make_response(404, "File not found.", "text/plain", "File not found.");
+            int send_result = send(socket_desc, response, strlen(response), 0);
+            if (send_result < 0) {
+                perror("send failed.");
+                exit(EXIT_FAILURE);
+            }
+        }
 
 		// Send the response
         // char *response = make_response(200, "OK", "text/plain", "Hello!");
@@ -176,6 +196,54 @@ char* make_response(int status_code, char *status_message, char *content_type, c
     strcat(response, content);
 
     return response;
+}
+
+
+int fileExists(const char *path) {
+    struct stat path_stat;
+    stat(path, &path_stat);
+    return S_ISREG(path_stat.st_mode);
+}
+
+char* resource_path(char* request_path) {
+    static char filename[MAX_PATH_LEN];
+    int filenameLength = snprintf(filename, sizeof(filename), "static%s", request_path);
+
+    // Check if the file exists as is
+    if (fileExists(filename)) {
+        return filename;
+    }
+
+    // Check if a directory exists with an index file
+    snprintf(filename + filenameLength, sizeof(filename) - filenameLength, "/index.html");
+    if (fileExists(filename)) {
+        return filename;
+    }
+
+    snprintf(filename + filenameLength, sizeof(filename) - filenameLength, "/index.md");
+    if (fileExists(filename)) {
+        return filename;
+    }
+
+    // Reset the filename back to before checking for index files
+    filename[filenameLength] = '\0';
+
+    // Try appending .html and .md to the original URL
+    snprintf(filename + filenameLength, sizeof(filename) - filenameLength, ".html");
+    if (fileExists(filename)) {
+        return filename;
+    }
+
+    snprintf(filename + filenameLength, sizeof(filename) - filenameLength, ".md");
+    if (fileExists(filename)) {
+        return filename;
+    }
+
+    return NULL;
+}
+
+cJSON* make_context() {
+    return cJSON_Parse("{}");
 }
 
 /**
