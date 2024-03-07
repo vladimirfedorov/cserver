@@ -120,7 +120,6 @@ int main(int argc, char **argv) {
 		printf("Method: %s\nURL: %s\n", method, url);
         char filename[url_len];
         char *path = resource_path(url);
-        // snprintf(filename, sizeof(filename), "%s/%s", STATIC_FOLDER, path);
         if (path != NULL) {
             printf("200 OK\n- request_path: %s\n- resource_path: %s\n", url, path);
             serve_file(socket_desc, path);
