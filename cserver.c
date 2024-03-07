@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
             serve_file(socket_desc, path);
         } else {
             printf("404 Not found\n- request_path: %s\n- resource_path: %s\n", url, path);
-            char *response = make_response(404, "File not found.", "text/plain", "File not found.");
+            char *response = make_response(404, "Not Found", "text/plain", "File not found.");
             int send_result = send(socket_desc, response, strlen(response), 0);
             if (send_result < 0) {
                 perror("send failed.");
