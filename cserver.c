@@ -21,7 +21,9 @@
 // Max path length
 #define MAX_PATH_LEN 4096
 
-// Status
+// HTTP Status codes
+// source: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+//
 // 200 OK
 #define HTTP_STATUS_200 "200 OK"
 // 404 Not Found
