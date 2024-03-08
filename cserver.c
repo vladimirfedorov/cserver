@@ -21,12 +21,16 @@
 // Max path length
 #define MAX_PATH_LEN 4096
 
+// Status
+// 200 OK
+#define HTTP_STATUS_200 "200 OK"
+// 404 Not Found
+#define HTTP_STATUS_404 "404 Not Found"
 
 /**
  * Generates an HTTP response string.
  *
- * @param status_code    HTTP status code.
- * @param status_message HTTP status message.
+ * @param http_status    HTTP status code and message.
  * @param content_type   The "Content-Type" header for the response.
  * @param content        The content to include in the response body.
  *
@@ -34,7 +38,7 @@
  *         The caller is responsible for freeing the allocated memory using free().
  *         Returns NULL if memory allocation fails.
  */
-char* make_response(int status_code, char *status_message, char *content_type, char *content);
+char* make_response(char *http_status, char *content_type, char *content);
 
 char* render_md(char *md_content, size_t md_length);
 
@@ -125,7 +129,7 @@ int main(int argc, char **argv) {
             serve_file(socket_desc, path);
         } else {
             printf("404 Not found\n- request_path: %s\n- resource_path: %s\n", url, path);
-            char *response = make_response(404, "Not Found", "text/plain", "File not found.");
+            char *response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
             int send_result = send(socket_desc, response, strlen(response), 0);
             if (send_result < 0) {
                 perror("send failed.");
@@ -151,8 +155,7 @@ int main(int argc, char **argv) {
 /**
  * Generates an HTTP response string.
  *
- * @param status_code    HTTP status code.
- * @param status_message HTTP status message.
+ * @param hhtp_status    HTTP status code and message.
  * @param content_type   The "Content-Type" header for the response.
  * @param content        The content to include in the response body.
  *
@@ -160,11 +163,11 @@ int main(int argc, char **argv) {
  *         The caller is responsible for freeing the allocated memory using free().
  *         Returns NULL if memory allocation fails.
  */
-char* make_response(int status_code, char *status_message, char *content_type, char *content) {
+char* make_response(char *http_status, char *content_type, char *content) {
     // Calculate the lengths of various parts of the HTTP response
     // CRLF is the standard line break (https://www.w3.org/MarkUp/html-spec/html-spec_8.html#SEC8.2.1)
     int content_length = strlen(content);
-    int status_line_length = snprintf(NULL, 0, "HTTP/1.1 %d %s\r\n", status_code, status_message);
+    int status_line_length = snprintf(NULL, 0, "HTTP/1.1 %s\r\n", http_status);
     int content_type_length = snprintf(NULL, 0, "Content-Type: %s\r\n", content_type);
     int content_length_length = snprintf(NULL, 0, "Content-Length: %d\r\n", content_length);
     
@@ -179,8 +182,8 @@ char* make_response(int status_code, char *status_message, char *content_type, c
     }
 
     // Construct the HTTP response
-    // HTTP
-    snprintf(response, total_length, "HTTP/1.1 %d %s\r\n", status_code, status_message);
+    // HTTP Status line
+    snprintf(response, total_length, "HTTP/1.1 %s\r\n", http_status);
     // Content-Type
     strcat(response, "Content-Type: ");
     strcat(response, content_type);
@@ -194,7 +197,7 @@ char* make_response(int status_code, char *status_message, char *content_type, c
     // Content
     strcat(response, content);
 
-    return response;
+    return response;    
 }
 
 
