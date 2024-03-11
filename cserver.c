@@ -134,6 +134,22 @@ int main(int argc, char **argv) {
         if (path != NULL) {
             printf("200 OK\n- request_path: %s\n- resource_path: %s\n", url, path);
             serve_file(socket_desc, path);
+
+            // // Read context from memory 
+            // cJSON *context = read_context();
+            // if (context == NULL) {
+            //     // if context doesn't exist, create one
+            //     context = make_context(root_path, request, );
+            // }
+            // char *content_type = get_content_type(request_path, resource_path);
+            // char *content = render_page(context, resource_path);
+            // char *response = make_response(HTTP_STATUS_200, content_type, content);
+            // int send_result = send(socket_desc, response, strlen(response), 0);
+            // if (send_result < 0) {
+            //     perror("send failed.");
+            //     exit(EXIT_FAILURE);
+            // }
+
         } else {
             printf("404 Not found\n- request_path: %s\n- resource_path: %s\n", url, path);
             char *response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
@@ -142,15 +158,22 @@ int main(int argc, char **argv) {
                 perror("send failed.");
                 exit(EXIT_FAILURE);
             }
+            
+            // char *response;
+            // char *page_404_path = resource_path("404");
+            // if (page_404_path != NULL) {
+            //     char *content_type = get_content_type(request_path, resource_path);
+            //     char *content = render_page(context, resource_path);
+            //     response = make_response(HTTP_STATUS_200, content_type, content);
+            // } else {
+            //     response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
+            // }
+            // int send_result = send(socket_desc, response, strlen(response), 0);
+            // if (send_result < 0) {
+            //     perror("send failed.");
+            //     exit(EXIT_FAILURE);
+            // }
         }
-
-		// Send the response
-        // char *response = make_response(200, "OK", "text/plain", "Hello!");
-		// int send_result = send(socket_desc, response, strlen(response), 0);
-        // if (send_result < 0) {
-        //     perror("send failed.");
-        //     exit(EXIT_FAILURE);
-        // }
 
         // Close the connection
         close(socket_desc);
