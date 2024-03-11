@@ -29,6 +29,11 @@
 // 404 Not Found
 #define HTTP_STATUS_404 "404 Not Found"
 
+// Constants
+const char *content_type_text = "text/html";
+const char *content_type_html = "text/plain";
+const char *content_type_json = "application/json";
+
 /**
  * Generates an HTTP response string.
  *
@@ -244,6 +249,22 @@ char* resource_path(char* request_path) {
     }
 
     return NULL;
+}
+
+int strends(char *str, char *suffix) {
+    size_t str_len = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    return strcmp(str + str_len - suffix_len, suffix);
+}
+
+const char* get_content_type(char *request_path, char *resource_path) {
+    if (strends(resource_path, ".md") == 0) {
+        return content_type_text;
+    } else if (strends(resource_path, ".json") == 0) {
+        return content_type_json;
+    } else {
+        return content_type_html;
+    }
 }
 
 cJSON* make_context() {
