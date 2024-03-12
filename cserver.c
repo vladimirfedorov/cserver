@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
             if (page_404_path != NULL) {
                 const char *content_type = get_content_type(url, page_404_path);
                 char *content = render_page(context, page_404_path);
-                response = make_response(HTTP_STATUS_200, content_type, content);
+                response = make_response(HTTP_STATUS_404, content_type, content);
             } else {
                 response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
             }
