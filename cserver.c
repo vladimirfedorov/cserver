@@ -30,8 +30,8 @@
 #define HTTP_STATUS_404 "404 Not Found"
 
 // Constants
-const char *content_type_text = "text/html";
-const char *content_type_html = "text/plain";
+const char *content_type_text = "text/plain";
+const char *content_type_html = "text/html";
 const char *content_type_json = "application/json";
 
 /**
@@ -45,7 +45,7 @@ const char *content_type_json = "application/json";
  *         The caller is responsible for freeing the allocated memory using free().
  *         Returns NULL if memory allocation fails.
  */
-char* make_response(char *http_status, char *content_type, char *content);
+char* make_response(char *http_status, const char *content_type, char *content);
 
 char* render_md(char *md_content, size_t md_length);
 
@@ -65,7 +65,13 @@ void serve_file(int socket, char *filename);
 
 char* resource_path(char *request_path);
 
-cJSON* make_context();
+cJSON* read_context();
+
+cJSON* make_context(char *method, char *request_path, char *resource_path);
+
+char* render_page(cJSON *context, char *path);
+
+const char* get_content_type(char *request_path, char *resource_path);
 
 int main(int argc, char **argv) {
 
@@ -131,48 +137,42 @@ int main(int argc, char **argv) {
 		printf("Method: %s\nURL: %s\n", method, url);
         char filename[url_len];
         char *path = resource_path(url);
+
+        // Read context from memory 
+        cJSON *context = read_context();
+        if (context == NULL) {
+            // if context doesn't exist, create one
+            context = make_context(method, url, path);
+        }
+
         if (path != NULL) {
             printf("200 OK\n- request_path: %s\n- resource_path: %s\n", url, path);
-            serve_file(socket_desc, path);
+            // serve_file(socket_desc, path);
 
-            // // Read context from memory 
-            // cJSON *context = read_context();
-            // if (context == NULL) {
-            //     // if context doesn't exist, create one
-            //     context = make_context(root_path, request, );
-            // }
-            // char *content_type = get_content_type(request_path, resource_path);
-            // char *content = render_page(context, resource_path);
-            // char *response = make_response(HTTP_STATUS_200, content_type, content);
-            // int send_result = send(socket_desc, response, strlen(response), 0);
-            // if (send_result < 0) {
-            //     perror("send failed.");
-            //     exit(EXIT_FAILURE);
-            // }
-
-        } else {
-            printf("404 Not found\n- request_path: %s\n- resource_path: %s\n", url, path);
-            char *response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
+            const char *content_type = get_content_type(url, path);
+            char *content = render_page(context, path);
+            char *response = make_response(HTTP_STATUS_200, content_type, content);
             int send_result = send(socket_desc, response, strlen(response), 0);
             if (send_result < 0) {
                 perror("send failed.");
                 exit(EXIT_FAILURE);
             }
-            
-            // char *response;
-            // char *page_404_path = resource_path("404");
-            // if (page_404_path != NULL) {
-            //     char *content_type = get_content_type(request_path, resource_path);
-            //     char *content = render_page(context, resource_path);
-            //     response = make_response(HTTP_STATUS_200, content_type, content);
-            // } else {
-            //     response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
-            // }
-            // int send_result = send(socket_desc, response, strlen(response), 0);
-            // if (send_result < 0) {
-            //     perror("send failed.");
-            //     exit(EXIT_FAILURE);
-            // }
+
+        } else {
+            char *response;
+            char *page_404_path = resource_path("/404");
+            if (page_404_path != NULL) {
+                const char *content_type = get_content_type(url, page_404_path);
+                char *content = render_page(context, page_404_path);
+                response = make_response(HTTP_STATUS_200, content_type, content);
+            } else {
+                response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
+            }
+            int send_result = send(socket_desc, response, strlen(response), 0);
+            if (send_result < 0) {
+                perror("send failed.");
+                exit(EXIT_FAILURE);
+            }
         }
 
         // Close the connection
@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
  *         The caller is responsible for freeing the allocated memory using free().
  *         Returns NULL if memory allocation fails.
  */
-char* make_response(char *http_status, char *content_type, char *content) {
+char* make_response(char *http_status, const char *content_type, char *content) {
     // Calculate the lengths of various parts of the HTTP response
     // CRLF is the standard line break (https://www.w3.org/MarkUp/html-spec/html-spec_8.html#SEC8.2.1)
     int content_length = strlen(content);
@@ -281,17 +281,84 @@ int strends(char *str, char *suffix) {
 }
 
 const char* get_content_type(char *request_path, char *resource_path) {
-    if (strends(resource_path, ".md") == 0) {
-        return content_type_text;
+    if (strends(resource_path, ".md") == 0 ||
+        strends(resource_path, ".html") == 0 ||
+        strends(resource_path, ".mustache") == 0) {
+        return content_type_html;
     } else if (strends(resource_path, ".json") == 0) {
         return content_type_json;
     } else {
-        return content_type_html;
+        return content_type_text;
     }
 }
 
-cJSON* make_context() {
+cJSON* read_context() {
+    return NULL;
+}
+
+cJSON* make_context(char *method, char *request_path, char *resource_path) {
     return cJSON_Parse("{}");
+}
+
+char* render_page(cJSON *context, char *path) {
+
+    char buffer[1024];
+    ssize_t bytes_read;
+
+    int file_fd;
+    // Open the requested file
+    file_fd = open(path, O_RDONLY);
+    
+    if (file_fd == -1) {
+        return NULL;
+    } 
+
+    if (strends(path, ".md") == 0) {
+        // Render markdown file
+        char* markdown_content = NULL;
+        size_t markdown_length = 0;
+
+        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+            markdown_content = realloc(markdown_content, markdown_length + bytes_read + 1);
+            memcpy(markdown_content + markdown_length, buffer, bytes_read);
+            markdown_length += bytes_read;
+        }
+
+        markdown_content[markdown_length] = '\0';
+
+        char* html_content = render_md(markdown_content, markdown_length);
+        if (markdown_content) free(markdown_content);
+        return html_content;
+
+    } else if (strends(path, ".mustache") == 0) {
+        // Render mustach file
+        char* template_content = NULL;
+        size_t template_length = 0;
+
+        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+            template_content = realloc(template_content, template_length + bytes_read + 1);
+            memcpy(template_content + template_length, buffer, bytes_read);
+            template_length += bytes_read;
+        }
+
+        template_content[template_length] = '\0';
+
+        char *html_content = render_mustache(template_content, template_length);
+        if (template_content) free(template_content);
+        return html_content;
+
+    } else {
+        // Send raw file data
+        char* raw_content = NULL;
+        size_t raw_length = 0;
+        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+            raw_content = realloc(raw_content, raw_length + bytes_read + 1);
+            memcpy(raw_content + raw_length, buffer, bytes_read);
+            raw_length += bytes_read;
+        }
+        return raw_content;
+    }
+    close(file_fd);
 }
 
 /**
