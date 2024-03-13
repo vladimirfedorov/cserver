@@ -145,35 +145,31 @@ int main(int argc, char **argv) {
             context = make_context(method, url, path);
         }
 
+        char *content;
+        char *response;
+
         if (path != NULL) {
-            printf("200 OK\n- request_path: %s\n- resource_path: %s\n", url, path);
-            // serve_file(socket_desc, path);
-
             const char *content_type = get_content_type(url, path);
-            char *content = render_page(context, path);
-            char *response = make_response(HTTP_STATUS_200, content_type, content);
-            int send_result = send(socket_desc, response, strlen(response), 0);
-            if (send_result < 0) {
-                perror("send failed.");
-                exit(EXIT_FAILURE);
-            }
-
+            content = render_page(context, path);
+            response = make_response(HTTP_STATUS_200, content_type, content);
         } else {
-            char *response;
             char *page_404_path = resource_path("/404");
             if (page_404_path != NULL) {
                 const char *content_type = get_content_type(url, page_404_path);
-                char *content = render_page(context, page_404_path);
+                content = render_page(context, page_404_path);
                 response = make_response(HTTP_STATUS_404, content_type, content);
             } else {
                 response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
             }
-            int send_result = send(socket_desc, response, strlen(response), 0);
-            if (send_result < 0) {
-                perror("send failed.");
-                exit(EXIT_FAILURE);
-            }
         }
+
+        int send_result = send(socket_desc, response, strlen(response), 0);
+        if (send_result < 0) {
+            perror("send failed.");
+            exit(EXIT_FAILURE);
+        }
+        if (content) free(content);
+        if (response) free(response);
 
         // Close the connection
         close(socket_desc);
