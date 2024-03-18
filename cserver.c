@@ -49,7 +49,7 @@ char* make_response(char *http_status, const char *content_type, char *content);
 
 char* render_md(char *md_content, size_t md_length);
 
-char* render_mustache(char *template_content, size_t template_length);
+char* render_mustache(char *template_content, size_t template_length, cJSON *context);
 
 /**
  * Serves static files to the client over a socket connection.
@@ -162,6 +162,8 @@ int main(int argc, char **argv) {
                 response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
             }
         }
+
+        cJSON_free(context);
 
         int send_result = send(socket_desc, response, strlen(response), 0);
         if (send_result < 0) {
@@ -293,7 +295,23 @@ cJSON* read_context() {
 }
 
 cJSON* make_context(char *method, char *request_path, char *resource_path) {
-    return cJSON_Parse("{}");
+    cJSON *context = cJSON_CreateObject();
+    // request
+    cJSON *request = cJSON_CreateObject();
+    cJSON *request_method = cJSON_CreateString(method);
+    cJSON_AddItemToObject(request, "method", request_method);
+    cJSON *request_request_path = cJSON_CreateString(request_path);
+    cJSON_AddItemToObject(request, "query", request_request_path);
+    cJSON *request_resource_path = cJSON_CreateString(resource_path);
+    cJSON_AddItemToObject(request, "resourcePath", request_resource_path);
+    cJSON_AddItemToObject(context, "request", request);
+    //
+    cJSON *content = cJSON_CreateString("Content");
+    cJSON_AddItemToObject(context, "content", content);
+    //
+    char *context_string = cJSON_Print(context);
+    printf("Context:\n%s\n", context_string);
+    return context;
 }
 
 char* render_page(cJSON *context, char *path) {
@@ -339,7 +357,7 @@ char* render_page(cJSON *context, char *path) {
 
         template_content[template_length] = '\0';
 
-        char *html_content = render_mustache(template_content, template_length);
+        char *html_content = render_mustache(template_content, template_length, context);
         if (template_content) free(template_content);
         return html_content;
 
@@ -393,10 +411,8 @@ char* render_md(char *md_content, size_t md_length) {
     return buf.output; // Return the HTML output
 }
 
-char* render_mustache(char *template_content, size_t template_length) {
+char* render_mustache(char *template_content, size_t template_length, cJSON *context) {
     printf("Temaplte %lu bytes:\n%s", template_length, template_content);
-
-    cJSON *root = cJSON_Parse("{\"content\": \"<b>Hello</b> there!\"}");
 
     // Render the template into a dynamic string (buffer growing as needed)
     char* output = NULL;
@@ -405,11 +421,9 @@ char* render_mustache(char *template_content, size_t template_length) {
 
     // Perform the mustach processing
     printf("Rendering template...\n");
-    int ret = mustach_cJSON_file(template_content, template_length, root, Mustach_With_AllExtensions, output_stream);
+    int ret = mustach_cJSON_file(template_content, template_length, context, Mustach_With_AllExtensions, output_stream);
     fflush(output_stream);
     fclose(output_stream);
-
-    free(root);
 
     // Check for errors in mustach processing
     if (ret != MUSTACH_OK) {
