@@ -6,8 +6,10 @@ The idea is to build a web server in C that:
 - [ ] Serves Markdown files, converting them to HTML files on the fly.
 	- [x] Markdown support (md4c)
 	- [x] Templates (mustach)
-	- [ ] Render pages / index files in folders
+	- [x] Render pages / index files in folders
 	      `/path/to/page`  can be a page.md file, page.html file, page/ folder with index.md or index.html file.
+	- [ ] Add config JSON file.
+	- [ ] Render `.md` files based on the provided template or `default.mustache` template.
 	- [ ] Categories based on pages metadata
 	- [ ] Atom feeds
 - [ ] Runs Lua scripts.
