@@ -402,7 +402,7 @@ char* render_md(char *md_content, size_t md_length) {
     html_buffer buf = {0};
 
     // Parse Markdown to HTML
-    if (md_html(md_content, md_length, output_callback, &buf, 0, 0) != 0) {
+    if (md_html(md_content, md_length, output_callback, &buf, MD_DIALECT_GITHUB, 0) != 0) {
         // Handle parsing error
         if (buf.output) free(buf.output);
         return NULL;
