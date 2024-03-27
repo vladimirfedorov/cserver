@@ -49,6 +49,10 @@ char* make_response(char *http_status, const char *content_type, char *content);
 
 char* render_md(char *md_content, size_t md_length);
 
+char* load_template(char *name);
+
+int load_partial(const char *name, struct mustach_sbuf *sbuf);
+
 char* render_mustache(char *template_content, size_t template_length, cJSON *context);
 
 /**
@@ -107,6 +111,8 @@ int main(int argc, char **argv) {
         perror("listen failed");
         return 1;
     }
+
+    mustach_wrap_get_partial = load_partial;
 
     while (1) {
         printf("Waiting for a connection...\n");
@@ -306,8 +312,8 @@ cJSON* make_context(char *method, char *request_path, char *resource_path) {
     cJSON_AddItemToObject(request, "resourcePath", request_resource_path);
     cJSON_AddItemToObject(context, "request", request);
     //
-    cJSON *content = cJSON_CreateString("Content");
-    cJSON_AddItemToObject(context, "content", content);
+    // cJSON *content = cJSON_CreateString("Content");
+    // cJSON_AddItemToObject(context, "content", content);
     //
     char *context_string = cJSON_Print(context);
     printf("Context:\n%s\n", context_string);
@@ -340,8 +346,17 @@ char* render_page(cJSON *context, char *path) {
 
         markdown_content[markdown_length] = '\0';
 
-        char* html_content = render_md(markdown_content, markdown_length);
+        char* md_html_content = render_md(markdown_content, markdown_length);
         if (markdown_content) free(markdown_content);
+        
+        cJSON *content = cJSON_CreateString(md_html_content);
+        cJSON_AddItemToObject(context, "content", content);
+        if (md_html_content) free(md_html_content);
+        
+        char *template_content = load_template("default");
+        char *html_content = render_mustache(template_content, strlen(template_content), context);
+        if (template_content) free(template_content);
+
         return html_content;
 
     } else if (strends(path, ".mustache") == 0) {
@@ -409,6 +424,59 @@ char* render_md(char *md_content, size_t md_length) {
     }
 
     return buf.output; // Return the HTML output
+}
+
+// Mustache templates
+
+int load_partial(const char *name, struct mustach_sbuf *sbuf) {
+    // Example of opening a file named after the partial. Adjust path as necessary.
+    char filename[256];
+    snprintf(filename, sizeof(filename), "templates/partials/%s.mustache", name);
+    FILE *file = fopen(filename, "r");
+    
+    if (!file) {
+        // Return an error if the file cannot be opened
+        printf("Partial %s not found.\n", filename);
+        return -1;
+    }
+    
+    // Seek to the end to find the file size
+    fseek(file, 0, SEEK_END);
+    long fsize = ftell(file);
+    fseek(file, 0, SEEK_SET);  // Rewind to the start
+    
+    // Allocate and read the file content
+    sbuf->value = malloc(fsize + 1);
+    fread((char *)sbuf->value, 1, fsize, file);
+    fclose(file);
+    
+    // Null-terminate and set size
+    ((char *)sbuf->value)[fsize] = '\0';
+    sbuf->length = fsize;
+    
+    return 0;
+}
+
+char* load_template(char *name) {
+    char filename[256];
+    snprintf(filename, sizeof(filename), "templates/%s.mustache", name);
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Tempalte %s not found.", filename);
+        return  NULL;
+    }
+    // Seek to the end to find the file size
+    fseek(file, 0, SEEK_END);
+    long fsize = ftell(file);
+    fseek(file, 0, SEEK_SET);  // Rewind to the start
+    
+    // Allocate and read the file content
+    char *template = malloc(fsize + 1);
+    fread(template, 1, fsize, file);
+    fclose(file);
+
+    template[fsize] = '\0';
+    return template;
 }
 
 char* render_mustache(char *template_content, size_t template_length, cJSON *context) {
