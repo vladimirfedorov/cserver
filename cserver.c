@@ -47,6 +47,8 @@ const char *content_type_json = "application/json";
  */
 char* make_response(char *http_status, const char *content_type, char *content);
 
+char* skip_metadata(char *input_content, cJSON *metadata);
+
 char* render_md(char *md_content, size_t md_length);
 
 char* load_template(char *name);
@@ -335,19 +337,21 @@ char* render_page(cJSON *context, char *path) {
 
     if (strends(path, ".md") == 0) {
         // Render markdown file
-        char* markdown_content = NULL;
-        size_t markdown_length = 0;
+        char *file_content = NULL;
+        size_t file_length = 0;
 
         while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
-            markdown_content = realloc(markdown_content, markdown_length + bytes_read + 1);
-            memcpy(markdown_content + markdown_length, buffer, bytes_read);
-            markdown_length += bytes_read;
+            file_content = realloc(file_content, file_length + bytes_read + 1);
+            memcpy(file_content + file_length, buffer, bytes_read);
+            file_length += bytes_read;
         }
+        file_content[file_length] = '\0';
 
-        markdown_content[markdown_length] = '\0';
-
-        char* md_html_content = render_md(markdown_content, markdown_length);
-        if (markdown_content) free(markdown_content);
+        cJSON *page_metadata = cJSON_CreateObject();
+        char *markdown_content = skip_metadata(file_content, page_metadata);
+        cJSON_AddItemToObject(context, "page", page_metadata);
+        char *md_html_content = render_md(markdown_content, strlen(markdown_content));
+        if (file_content) free(file_content);
         
         cJSON *content = cJSON_CreateString(md_html_content);
         cJSON_AddItemToObject(context, "content", content);
@@ -409,6 +413,52 @@ void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
     buf->output = new_output;
     buf->size += size;
     buf->output[buf->size] = '\0'; // Ensure null-termination
+}
+
+// Skips metadata and returns the pointer to markdown content inside input_content.
+// All metadata parameters are stored in cJSON object.
+// New memory is not allocated here, free input_content only.
+//
+// Metadata format:
+// ---
+// key: value
+// ---
+// <new line>
+// Markdown content
+//
+char* skip_metadata(char *input_content, cJSON *metadata) {
+    // Check if the first line is ---
+    if (strncmp(input_content, "---\n", 4) != 0) {
+        // If not, return the original input_content
+        return input_content;
+    } else {
+        // Skip the first line (---)
+        char *line = input_content + 4;
+        char *next_line = NULL;
+        while ((next_line = strstr(line, "\n")) != NULL) {
+            // Check for the end of the metadata section
+            if (line == next_line) {
+                // Return the pointer to the beginning of markdown content
+                return next_line + 1;
+            }
+
+            *next_line = '\0';
+            char *colon = strchr(line, ':');
+            if (colon != NULL) {
+                *colon = '\0';      // change to simplify memory management 
+                char *key = line;
+                char *value = colon + 1;
+                cJSON_AddStringToObject(metadata, key, value);
+                *colon = ':';       // restore back
+            }
+            *next_line = '\n';
+            line = next_line + 1;
+        }
+    }
+    // If we are here, it means the page has no content, just metadata.
+    // Not sure how to proceed with that.
+    // Return all page content for now.
+    return input_content;
 }
 
 char* render_md(char *md_content, size_t md_length) {
