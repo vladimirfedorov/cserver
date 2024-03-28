@@ -1,3 +1,9 @@
+---
+# template: custom
+title: Page title
+author: Anonymous
+---
+
 # H1
 
 ## H2
