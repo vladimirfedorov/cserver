@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -279,6 +280,19 @@ int strends(char *str, char *suffix) {
     return strcmp(str + str_len - suffix_len, suffix);
 }
 
+// Trims string in place; 
+// works with allocated strings
+void trim(char *str) {
+    char *p = str;
+    int len = strlen(p);
+    if (len == 0) return;
+
+    while(isspace(p[len - 1])) p[--len] = 0;
+    while(*p && isspace(*p)) ++p, --len;
+
+    memmove(str, p, len + 1);
+}
+
 const char* get_content_type(char *request_path, char *resource_path) {
     if (strends(resource_path, ".md") == 0 ||
         strends(resource_path, ".html") == 0 ||
@@ -335,14 +349,28 @@ char* render_page(cJSON *context, char *path) {
         cJSON_AddItemToObject(context, "page", page_metadata);
         char *md_html_content = render_md(markdown_content, strlen(markdown_content));
         if (file_content) free(file_content);
-        
+
         cJSON *content = cJSON_CreateString(md_html_content);
         cJSON_AddItemToObject(context, "content", content);
         if (md_html_content) free(md_html_content);
-        
-        char *template_content = load_template("default");
-        char *html_content = render_mustache(template_content, strlen(template_content), context);
+
+        char *template_name = "default";
+        cJSON *page_template_object = cJSON_GetObjectItem(page_metadata, "template");
+        if (page_template_object) {
+            template_name = page_template_object->valuestring;
+        }
+        char *template_content = load_template(template_name);
+        char *default_temaplte = "{{{content}}}";
+        char *html_content;
+        if (template_content) {
+            html_content = render_mustache(template_content, strlen(template_content), context);
+        } else {
+            html_content = render_mustache(default_temaplte, strlen(default_temaplte), context);
+        }
         if (template_content) free(template_content);
+        if (page_metadata) cJSON_free(page_metadata);
+        if (page_template_object) cJSON_free(page_template_object);
+        if (content) cJSON_free(content);
 
         return html_content;
 
@@ -425,6 +453,8 @@ char* skip_metadata(char *input_content, cJSON *metadata) {
         // Skip the first line (---)
         char *line = input_content + 4;
         char *next_line = NULL;
+
+        // TODO: Skip commented (#) lines
         while ((next_line = strstr(line, "\n")) != NULL) {
             // Check for the end of the metadata section
             if (line == next_line) {
@@ -438,6 +468,8 @@ char* skip_metadata(char *input_content, cJSON *metadata) {
                 *colon = '\0';      // change to simplify memory management 
                 char *key = line;
                 char *value = colon + 1;
+                trim(key);
+                trim(value);
                 cJSON_AddStringToObject(metadata, key, value);
                 *colon = ':';       // restore back
             }
@@ -502,7 +534,7 @@ char* load_template(char *name) {
     snprintf(filename, sizeof(filename), "templates/%s.mustache", name);
     FILE *file = fopen(filename, "r");
     if (!file) {
-        printf("Tempalte %s not found.", filename);
+        printf("Tempalte %s not found.\n", filename);
         return  NULL;
     }
     // Seek to the end to find the file size

@@ -1,4 +1,5 @@
 ---
+# template: custom
 title: Page title
 author: Anonymous
 ---
