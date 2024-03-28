@@ -71,8 +71,6 @@ void serve_file(int socket, char *filename);
 
 char* resource_path(char *request_path);
 
-cJSON* read_context();
-
 cJSON* make_context(char *method, char *request_path, char *resource_path);
 
 char* render_page(cJSON *context, char *path);
@@ -146,12 +144,7 @@ int main(int argc, char **argv) {
         char filename[url_len];
         char *path = resource_path(url);
 
-        // Read context from memory 
-        cJSON *context = read_context();
-        if (context == NULL) {
-            // if context doesn't exist, create one
-            context = make_context(method, url, path);
-        }
+        cJSON *context = make_context(method, url, path);
 
         char *content;
         char *response;
@@ -298,10 +291,6 @@ const char* get_content_type(char *request_path, char *resource_path) {
     }
 }
 
-cJSON* read_context() {
-    return NULL;
-}
-
 cJSON* make_context(char *method, char *request_path, char *resource_path) {
     cJSON *context = cJSON_CreateObject();
     // request
@@ -313,12 +302,6 @@ cJSON* make_context(char *method, char *request_path, char *resource_path) {
     cJSON *request_resource_path = cJSON_CreateString(resource_path);
     cJSON_AddItemToObject(request, "resourcePath", request_resource_path);
     cJSON_AddItemToObject(context, "request", request);
-    //
-    // cJSON *content = cJSON_CreateString("Content");
-    // cJSON_AddItemToObject(context, "content", content);
-    //
-    char *context_string = cJSON_Print(context);
-    printf("Context:\n%s\n", context_string);
     return context;
 }
 
@@ -415,17 +398,24 @@ void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
     buf->output[buf->size] = '\0'; // Ensure null-termination
 }
 
-// Skips metadata and returns the pointer to markdown content inside input_content.
-// All metadata parameters are stored in cJSON object.
-// New memory is not allocated here, free input_content only.
-//
-// Metadata format:
-// ---
-// key: value
-// ---
-// <new line>
-// Markdown content
-//
+/**
+ * Skips metadata and returns the pointer to markdown content inside input_content.
+ * 
+ * @param input_content     Markdown content with page metadata.
+ * @param metadata          cJSON object for page metadata.
+ * 
+ * @return  A pointer to the beginning of markdown content.
+ * 
+ * All metadata parameters are stored in cJSON object.
+ * New memory is not allocated here, free input_content only.
+ * 
+ * Expected metadata format:
+ * ---
+ * key: value
+ * ---
+ * <new line>
+ * Markdown content
+ */
 char* skip_metadata(char *input_content, cJSON *metadata) {
     // Check if the first line is ---
     if (strncmp(input_content, "---\n", 4) != 0) {
