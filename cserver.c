@@ -476,11 +476,9 @@ char* skip_metadata(char *input_content, cJSON *metadata) {
             *next_line = '\n';
             line = next_line + 1;
         }
+        // If we are here, it means the page has no content, just metadata.
+        return next_line;
     }
-    // If we are here, it means the page has no content, just metadata.
-    // Not sure how to proceed with that.
-    // Return all page content for now.
-    return input_content;
 }
 
 char* render_md(char *md_content, size_t md_length) {
