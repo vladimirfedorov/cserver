@@ -34,6 +34,7 @@ const char *content_type_text = "text/plain";
 const char *content_type_html = "text/html";
 const char *content_type_json = "application/json";
 
+// Strings
 struct cstring {
     char *value;
     long length;
@@ -41,8 +42,9 @@ struct cstring {
 typedef struct cstring string;      // call string_free
 typedef struct cstring substring;   // do not free
 
-
-
+string string_make(const char* value);
+void string_free(string str);
+string read_file(const char *filename);
 
 /**
  * Generates an HTTP response string.
@@ -56,16 +58,6 @@ typedef struct cstring substring;   // do not free
  *         Returns NULL if memory allocation fails.
  */
 string make_response(char *http_status, const char *content_type, string content);
-
-substring skip_metadata(string input_content, cJSON *metadata);
-
-string render_markdown_(string markdown_content);
-
-string load_template(char* name);
-
-int load_partial(const char *name, struct mustach_sbuf *sbuf);
-
-string render_mustache(string template, cJSON *context);
 
 /**
  * Serves static files to the client over a socket connection.
@@ -87,60 +79,17 @@ string render_page(cJSON *context, char *path);
 
 const char* get_content_type(char *request_path, char *resource_path);
 
+substring skip_metadata(string input_content, cJSON *metadata);
+
+string render_markdown(string markdown_content);
+
+string load_template(char* name);
+
+int load_partial(const char *name, struct mustach_sbuf *sbuf);
+
+string render_mustache(string template, cJSON *context);
 
 
-string string_make(const char* value) {
-    size_t value_length = strlen(value);
-    string result = { .value = malloc(value_length + 1), .length = value_length };
-    strcpy(result.value, value);
-    return result;
-}
-
-void string_free(string str) {
-    if (str.value) free(str.value);
-}
-
-string read_file(const char *filename) {
-    string result = { .value = NULL, .length = 0};
-
-    FILE *file = fopen(filename, "rb");
-    if (file == NULL)  return result;
-    
-    // File size
-    fseek(file, 0, SEEK_END);
-    long file_length = ftell(file);
-    if (file_length == -1) {
-        perror("Failed to determine file size");
-        fclose(file);
-        return result;
-    }
-    rewind(file);
-
-    // Allocate memory for file content
-    char *content = (char *)malloc(file_length + 1); // +1 for the null terminator
-    if (content == NULL) {
-        perror("Failed to allocate memory");
-        fclose(file);
-        return result;
-    }
-
-    // Read file into memory
-    if (fread(content, sizeof(char), file_length, file) < file_length) {
-        perror("Failed to read the file");
-        free(content);
-        fclose(file);
-        return result;
-    }
-    content[file_length] = '\0'; // Null-terminate the string
-
-    // Close the file
-    fclose(file);
-
-    result.value = content;
-    result.length = file_length;
-
-    return result;
-}
 
 int main(int argc, char **argv) {
 
@@ -248,6 +197,64 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+/**
+ * String Functions
+ */
+
+string string_make(const char* value) {
+    size_t value_length = strlen(value);
+    string result = { .value = malloc(value_length + 1), .length = value_length };
+    strcpy(result.value, value);
+    return result;
+}
+
+void string_free(string str) {
+    if (str.value) free(str.value);
+}
+
+string read_file(const char *filename) {
+    string result = { .value = NULL, .length = 0};
+
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL)  return result;
+    
+    // File size
+    fseek(file, 0, SEEK_END);
+    long file_length = ftell(file);
+    if (file_length == -1) {
+        perror("Failed to determine file size");
+        fclose(file);
+        return result;
+    }
+    rewind(file);
+
+    // Allocate memory for file content
+    char *content = (char *)malloc(file_length + 1); // +1 for the null terminator
+    if (content == NULL) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return result;
+    }
+
+    // Read file into memory
+    if (fread(content, sizeof(char), file_length, file) < file_length) {
+        perror("Failed to read the file");
+        free(content);
+        fclose(file);
+        return result;
+    }
+    content[file_length] = '\0'; // Null-terminate the string
+
+    // Close the file
+    fclose(file);
+
+    result.value = content;
+    result.length = file_length;
+
+    return result;
+}
+
 
 /**
  * Generates an HTTP response string.
@@ -399,7 +406,7 @@ string render_page(cJSON *context, char *path) {
         cJSON *page_metadata = cJSON_CreateObject();
         substring markdown_content = skip_metadata(file_content, page_metadata);
         cJSON_AddItemToObject(context, "page", page_metadata);
-        string md_html_content = render_markdown_(markdown_content);
+        string md_html_content = render_markdown(markdown_content);
         string_free(file_content);
         
         // context.content = rendered markdown data
@@ -442,26 +449,6 @@ string render_page(cJSON *context, char *path) {
     }
 }
 
-// Markdown renderer
-
-typedef struct {
-    char *output;
-    size_t size;
-} html_buffer;
-
-// Callback function to append the output HTML
-void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
-    html_buffer *buf = (html_buffer *)userdata;
-    char *new_output = realloc(buf->output, buf->size + size + 1); // +1 for null terminator
-    if (!new_output) {
-        // Handle allocation failure
-        return;
-    }
-    memcpy(new_output + buf->size, text, size); // Append new HTML fragment
-    buf->output = new_output;
-    buf->size += size;
-    buf->output[buf->size] = '\0'; // Ensure null-termination
-}
 
 /**
  * Skips metadata and returns the pointer to markdown content inside input_content.
@@ -523,7 +510,28 @@ substring skip_metadata(string input_content, cJSON *metadata) {
     }
 }
 
-string render_markdown_(string markdown_content) {
+// Markdown renderer
+
+typedef struct {
+    char *output;
+    size_t size;
+} html_buffer;
+
+// Callback function to append the output HTML
+void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
+    html_buffer *buf = (html_buffer *)userdata;
+    char *new_output = realloc(buf->output, buf->size + size + 1); // +1 for null terminator
+    if (!new_output) {
+        // Handle allocation failure
+        return;
+    }
+    memcpy(new_output + buf->size, text, size); // Append new HTML fragment
+    buf->output = new_output;
+    buf->size += size;
+    buf->output[buf->size] = '\0'; // Ensure null-termination
+}
+
+string render_markdown(string markdown_content) {
     html_buffer buf = {0};
     string result = { .value = NULL, .length = 0 };
 
@@ -539,7 +547,9 @@ string render_markdown_(string markdown_content) {
     return result;
 }
 
-// Mustache templates
+/*
+ * Mustache templates
+ */
 
 int load_partial(const char *name, struct mustach_sbuf *sbuf) {
     // Example of opening a file named after the partial. Adjust path as necessary.
