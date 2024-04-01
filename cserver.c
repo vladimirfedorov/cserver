@@ -300,7 +300,7 @@ string make_response(char *http_status, const char *content_type, string content
 }
 
 
-int fileExists(const char *path) {
+int file_exists(const char *path) {
     struct stat path_stat;
     stat(path, &path_stat);
     return S_ISREG(path_stat.st_mode);
@@ -311,18 +311,18 @@ char* resource_path(char* request_path) {
     int filenameLength = snprintf(filename, sizeof(filename), "static%s", request_path);
 
     // Check if the file exists as is
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
     // Check if a directory exists with an index file
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, "/index.html");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, "/index.md");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
@@ -331,12 +331,12 @@ char* resource_path(char* request_path) {
 
     // Try appending .html and .md to the original URL
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, ".html");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, ".md");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
