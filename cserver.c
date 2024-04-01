@@ -6,7 +6,6 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 // Markdown
 #include "md4c/src/md4c-html.h"
@@ -35,6 +34,18 @@ const char *content_type_text = "text/plain";
 const char *content_type_html = "text/html";
 const char *content_type_json = "application/json";
 
+// Strings
+struct cstring {
+    char *value;
+    long length;
+};
+typedef struct cstring string;      // call string_free
+typedef struct cstring substring;   // do not free
+
+string string_make(const char* value);
+void string_free(string str);
+string read_file(const char *filename);
+
 /**
  * Generates an HTTP response string.
  *
@@ -46,17 +57,7 @@ const char *content_type_json = "application/json";
  *         The caller is responsible for freeing the allocated memory using free().
  *         Returns NULL if memory allocation fails.
  */
-char* make_response(char *http_status, const char *content_type, char *content);
-
-char* skip_metadata(char *input_content, cJSON *metadata);
-
-char* render_md(char *md_content, size_t md_length);
-
-char* load_template(char *name);
-
-int load_partial(const char *name, struct mustach_sbuf *sbuf);
-
-char* render_mustache(char *template_content, size_t template_length, cJSON *context);
+string make_response(char *http_status, const char *content_type, string content);
 
 /**
  * Serves static files to the client over a socket connection.
@@ -74,13 +75,25 @@ char* resource_path(char *request_path);
 
 cJSON* make_context(char *method, char *request_path, char *resource_path);
 
-char* render_page(cJSON *context, char *path);
+string render_page(cJSON *context, char *path);
 
 const char* get_content_type(char *request_path, char *resource_path);
 
+substring skip_metadata(string input_content, cJSON *metadata);
+
+string render_markdown(string markdown_content);
+
+string load_template(char* name);
+
+int load_partial(const char *name, struct mustach_sbuf *sbuf);
+
+string render_mustache(string template, cJSON *context);
+
+
+
 int main(int argc, char **argv) {
 
-    // Request data buffer length    
+    // Request data buffer length
     const size_t buffer_len = 4096;
     // HTTP method length
     const size_t method_len = 8;
@@ -113,6 +126,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // mustach library hook for partials, see mustach-wrap.h
     mustach_wrap_get_partial = load_partial;
 
     while (1) {
@@ -147,8 +161,8 @@ int main(int argc, char **argv) {
 
         cJSON *context = make_context(method, url, path);
 
-        char *content;
-        char *response;
+        string content;
+        string response;
 
         if (path != NULL) {
             const char *content_type = get_content_type(url, path);
@@ -161,19 +175,21 @@ int main(int argc, char **argv) {
                 content = render_page(context, page_404_path);
                 response = make_response(HTTP_STATUS_404, content_type, content);
             } else {
-                response = make_response(HTTP_STATUS_404, "text/plain", "File not found.");
+                string not_found = string_make("File not found.");
+                response = make_response(HTTP_STATUS_404, "text/plain", not_found);
+                string_free(not_found);
             }
         }
 
         cJSON_free(context);
 
-        int send_result = send(socket_desc, response, strlen(response), 0);
+        int send_result = send(socket_desc, response.value, response.length, 0);
         if (send_result < 0) {
             perror("send failed.");
             exit(EXIT_FAILURE);
         }
-        if (content) free(content);
-        if (response) free(response);
+        string_free(content);
+        string_free(response);
 
         // Close the connection
         close(socket_desc);
@@ -181,6 +197,64 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+/**
+ * String Functions
+ */
+
+string string_make(const char* value) {
+    size_t value_length = strlen(value);
+    string result = { .value = malloc(value_length + 1), .length = value_length };
+    strcpy(result.value, value);
+    return result;
+}
+
+void string_free(string str) {
+    if (str.value) free(str.value);
+}
+
+string read_file(const char *filename) {
+    string result = { .value = NULL, .length = 0};
+
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL)  return result;
+    
+    // File size
+    fseek(file, 0, SEEK_END);
+    long file_length = ftell(file);
+    if (file_length == -1) {
+        perror("Failed to determine file size");
+        fclose(file);
+        return result;
+    }
+    rewind(file);
+
+    // Allocate memory for file content
+    char *content = (char *)malloc(file_length + 1); // +1 for the null terminator
+    if (content == NULL) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return result;
+    }
+
+    // Read file into memory
+    if (fread(content, sizeof(char), file_length, file) < file_length) {
+        perror("Failed to read the file");
+        free(content);
+        fclose(file);
+        return result;
+    }
+    content[file_length] = '\0'; // Null-terminate the string
+
+    // Close the file
+    fclose(file);
+
+    result.value = content;
+    result.length = file_length;
+
+    return result;
+}
+
 
 /**
  * Generates an HTTP response string.
@@ -193,22 +267,22 @@ int main(int argc, char **argv) {
  *         The caller is responsible for freeing the allocated memory using free().
  *         Returns NULL if memory allocation fails.
  */
-char* make_response(char *http_status, const char *content_type, char *content) {
+string make_response(char *http_status, const char *content_type, string content) {
+    string result = { .value = NULL, .length = 0 };
     // Calculate the lengths of various parts of the HTTP response
     // CRLF is the standard line break (https://www.w3.org/MarkUp/html-spec/html-spec_8.html#SEC8.2.1)
-    int content_length = strlen(content);
     int status_line_length = snprintf(NULL, 0, "HTTP/1.1 %s\r\n", http_status);
     int content_type_length = snprintf(NULL, 0, "Content-Type: %s\r\n", content_type);
-    int content_length_length = snprintf(NULL, 0, "Content-Length: %d\r\n", content_length);
+    int content_length_length = snprintf(NULL, 0, "Content-Length: %li\r\n", content.length);
     
     // Calculate the total length of the HTTP response
     // + 2 for \r\n before content
-    int total_length = status_line_length + content_type_length + content_length_length + 2 + content_length; 
+    int total_length = status_line_length + content_type_length + content_length_length + 2 + content.length; 
     
     // Allocate memory for the complete HTTP response
     char *response = (char*)malloc(total_length);
     if (response == NULL) {
-        return NULL;
+        return result;
     }
 
     // Construct the HTTP response
@@ -220,18 +294,20 @@ char* make_response(char *http_status, const char *content_type, char *content) 
     strcat(response, "\r\n");
     // Content-Length
     char content_length_str[content_length_length];
-    sprintf(content_length_str, "Content-Length: %d\r\n", content_length);
+    sprintf(content_length_str, "Content-Length: %li\r\n", content.length);
     strcat(response, content_length_str);
     // Empty line to separate headers from the content
     strcat(response, "\r\n"); 
     // Content
-    strcat(response, content);
+    strcat(response, content.value);
 
-    return response;    
+    result.value = response;
+    result.length = strlen(response);
+    return result;
 }
 
 
-int fileExists(const char *path) {
+int file_exists(const char *path) {
     struct stat path_stat;
     stat(path, &path_stat);
     return S_ISREG(path_stat.st_mode);
@@ -242,18 +318,18 @@ char* resource_path(char* request_path) {
     int filenameLength = snprintf(filename, sizeof(filename), "static%s", request_path);
 
     // Check if the file exists as is
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
     // Check if a directory exists with an index file
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, "/index.html");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, "/index.md");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
@@ -262,12 +338,12 @@ char* resource_path(char* request_path) {
 
     // Try appending .html and .md to the original URL
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, ".html");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
     snprintf(filename + filenameLength, sizeof(filename) - filenameLength, ".md");
-    if (fileExists(filename)) {
+    if (file_exists(filename)) {
         return filename;
     }
 
@@ -319,55 +395,39 @@ cJSON* make_context(char *method, char *request_path, char *resource_path) {
     return context;
 }
 
-char* render_page(cJSON *context, char *path) {
+string render_page(cJSON *context, char *path) {
 
-    char buffer[1024];
-    ssize_t bytes_read;
-
-    int file_fd;
-    // Open the requested file
-    file_fd = open(path, O_RDONLY);
-    
-    if (file_fd == -1) {
-        return NULL;
-    } 
+    string file_content = read_file(path);
+    if (file_content.value == NULL) return file_content;
 
     if (strends(path, ".md") == 0) {
+        
         // Render markdown file
-        char *file_content = NULL;
-        size_t file_length = 0;
-
-        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
-            file_content = realloc(file_content, file_length + bytes_read + 1);
-            memcpy(file_content + file_length, buffer, bytes_read);
-            file_length += bytes_read;
-        }
-        file_content[file_length] = '\0';
-
         cJSON *page_metadata = cJSON_CreateObject();
-        char *markdown_content = skip_metadata(file_content, page_metadata);
+        substring markdown_content = skip_metadata(file_content, page_metadata);
         cJSON_AddItemToObject(context, "page", page_metadata);
-        char *md_html_content = render_md(markdown_content, strlen(markdown_content));
-        if (file_content) free(file_content);
-
-        cJSON *content = cJSON_CreateString(md_html_content);
+        string md_html_content = render_markdown(markdown_content);
+        string_free(file_content);
+        
+        // context.content = rendered markdown data
+        cJSON *content = cJSON_CreateString(md_html_content.value);
         cJSON_AddItemToObject(context, "content", content);
-        if (md_html_content) free(md_html_content);
+        string_free(md_html_content);
 
+        // mustache template for the file
         char *template_name = "default";
         cJSON *page_template_object = cJSON_GetObjectItem(page_metadata, "template");
         if (page_template_object) {
             template_name = page_template_object->valuestring;
         }
-        char *template_content = load_template(template_name);
-        char *default_temaplte = "{{{content}}}";
-        char *html_content;
-        if (template_content) {
-            html_content = render_mustache(template_content, strlen(template_content), context);
-        } else {
-            html_content = render_mustache(default_temaplte, strlen(default_temaplte), context);
+        string template = load_template(template_name);
+        if (template.value == NULL) {
+            template = string_make("{{{content}}}");
         }
-        if (template_content) free(template_content);
+
+        // Render mustache template with the provided content
+        string html_content = render_mustache(template, context);
+        string_free(template);
         if (page_metadata) cJSON_free(page_metadata);
         if (page_template_object) cJSON_free(page_template_object);
         if (content) cJSON_free(content);
@@ -375,34 +435,79 @@ char* render_page(cJSON *context, char *path) {
         return html_content;
 
     } else if (strends(path, ".mustache") == 0) {
+        
         // Render mustach file
-        char* template_content = NULL;
-        size_t template_length = 0;
-
-        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
-            template_content = realloc(template_content, template_length + bytes_read + 1);
-            memcpy(template_content + template_length, buffer, bytes_read);
-            template_length += bytes_read;
-        }
-
-        template_content[template_length] = '\0';
-
-        char *html_content = render_mustache(template_content, template_length, context);
-        if (template_content) free(template_content);
-        return html_content;
+        string rendered_content = render_mustache(file_content, context);
+        if (file_content.value) free(file_content.value);
+        return rendered_content;
 
     } else {
+        
         // Send raw file data
-        char* raw_content = NULL;
-        size_t raw_length = 0;
-        while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
-            raw_content = realloc(raw_content, raw_length + bytes_read + 1);
-            memcpy(raw_content + raw_length, buffer, bytes_read);
-            raw_length += bytes_read;
-        }
-        return raw_content;
+        return file_content;
+
     }
-    close(file_fd);
+}
+
+
+/**
+ * Skips metadata and returns the pointer to markdown content inside input_content.
+ * 
+ * @param input_content     Markdown content with page metadata.
+ * @param metadata          cJSON object for page metadata.
+ * 
+ * @return  A pointer to the beginning of markdown content.
+ * 
+ * All metadata parameters are stored in cJSON object.
+ * New memory is not allocated here, free input_content only.
+ * 
+ * Expected metadata format:
+ * ---
+ * key: value
+ * ---
+ * <new line>
+ * Markdown content
+ */
+substring skip_metadata(string input_content, cJSON *metadata) {
+    substring result = { .value = input_content.value, .length = input_content.length };
+    // Check if the first line is ---
+    if (strncmp(result.value, "---\n", 4) != 0) {
+        // If not, return the original input_content
+        return result;
+    } else {
+        // Skip the first line (---)
+        char *line = result.value + 4;
+        char *next_line = NULL;
+
+        // TODO: Skip commented (#) lines
+        while ((next_line = strstr(line, "\n")) != NULL) {
+            // Check for the end of the metadata section
+            if (line == next_line) {
+                result.value = next_line + 1;
+                result.length -= result.value - input_content.value;
+                // Return the pointer to the beginning of markdown content
+                printf("input_content.length = %li, result.length = %li\n", input_content.length, result.length);
+                return result;
+            }
+
+            *next_line = '\0';
+            char *colon = strchr(line, ':');
+            if (colon != NULL) {
+                *colon = '\0';      // change to simplify memory management 
+                char *key = line;
+                char *value = colon + 1;
+                trim(key);
+                trim(value);
+                cJSON_AddStringToObject(metadata, key, value);
+                *colon = ':';       // restore back
+            }
+            *next_line = '\n';
+            line = next_line + 1;
+        }
+        // If we are here, it means the page has no content, just metadata.
+        result.length = 0;
+        return result;
+    }
 }
 
 // Markdown renderer
@@ -426,81 +531,29 @@ void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
     buf->output[buf->size] = '\0'; // Ensure null-termination
 }
 
-/**
- * Skips metadata and returns the pointer to markdown content inside input_content.
- * 
- * @param input_content     Markdown content with page metadata.
- * @param metadata          cJSON object for page metadata.
- * 
- * @return  A pointer to the beginning of markdown content.
- * 
- * All metadata parameters are stored in cJSON object.
- * New memory is not allocated here, free input_content only.
- * 
- * Expected metadata format:
- * ---
- * key: value
- * ---
- * <new line>
- * Markdown content
- */
-char* skip_metadata(char *input_content, cJSON *metadata) {
-    // Check if the first line is ---
-    if (strncmp(input_content, "---\n", 4) != 0) {
-        // If not, return the original input_content
-        return input_content;
-    } else {
-        // Skip the first line (---)
-        char *line = input_content + 4;
-        char *next_line = NULL;
-
-        // TODO: Skip commented (#) lines
-        while ((next_line = strstr(line, "\n")) != NULL) {
-            // Check for the end of the metadata section
-            if (line == next_line) {
-                // Return the pointer to the beginning of markdown content
-                return next_line + 1;
-            }
-
-            *next_line = '\0';
-            char *colon = strchr(line, ':');
-            if (colon != NULL) {
-                *colon = '\0';      // change to simplify memory management 
-                char *key = line;
-                char *value = colon + 1;
-                trim(key);
-                trim(value);
-                cJSON_AddStringToObject(metadata, key, value);
-                *colon = ':';       // restore back
-            }
-            *next_line = '\n';
-            line = next_line + 1;
-        }
-        // If we are here, it means the page has no content, just metadata.
-        return next_line;
-    }
-}
-
-char* render_md(char *md_content, size_t md_length) {
-    printf("Markdown %lu bytes:\n%s", md_length, md_content);
-
+string render_markdown(string markdown_content) {
     html_buffer buf = {0};
+    string result = { .value = NULL, .length = 0 };
 
     // Parse Markdown to HTML
-    if (md_html(md_content, md_length, output_callback, &buf, MD_DIALECT_GITHUB, 0) != 0) {
+    if (md_html(markdown_content.value, markdown_content.length, output_callback, &buf, MD_DIALECT_GITHUB, 0) != 0) {
         // Handle parsing error
         if (buf.output) free(buf.output);
-        return NULL;
+        return result;
     }
 
-    return buf.output; // Return the HTML output
+    result.value = buf.output;
+    result.length = buf.size;
+    return result;
 }
 
-// Mustache templates
+/*
+ * Mustache templates
+ */
 
 int load_partial(const char *name, struct mustach_sbuf *sbuf) {
     // Example of opening a file named after the partial. Adjust path as necessary.
-    char filename[256];
+    char filename[MAX_PATH_LEN];
     snprintf(filename, sizeof(filename), "templates/partials/%s.mustache", name);
     FILE *file = fopen(filename, "r");
     
@@ -527,39 +580,26 @@ int load_partial(const char *name, struct mustach_sbuf *sbuf) {
     return 0;
 }
 
-char* load_template(char *name) {
-    char filename[256];
+string load_template(char* name) {
+    char filename[MAX_PATH_LEN];
     snprintf(filename, sizeof(filename), "templates/%s.mustache", name);
-    FILE *file = fopen(filename, "r");
-    if (!file) {
+    string template = read_file(filename);
+    if (template.value == NULL) {
         printf("Tempalte %s not found.\n", filename);
-        return  NULL;
     }
-    // Seek to the end to find the file size
-    fseek(file, 0, SEEK_END);
-    long fsize = ftell(file);
-    fseek(file, 0, SEEK_SET);  // Rewind to the start
-    
-    // Allocate and read the file content
-    char *template = malloc(fsize + 1);
-    fread(template, 1, fsize, file);
-    fclose(file);
-
-    template[fsize] = '\0';
     return template;
 }
 
-char* render_mustache(char *template_content, size_t template_length, cJSON *context) {
-    printf("Temaplte %lu bytes:\n%s", template_length, template_content);
+string render_mustache(string template, cJSON *context) {
+    string result = { .value = NULL, .length = 0 };
 
-    // Render the template into a dynamic string (buffer growing as needed)
     char* output = NULL;
     size_t output_size = 0;
     FILE* output_stream = open_memstream(&output, &output_size);
 
     // Perform the mustach processing
     printf("Rendering template...\n");
-    int ret = mustach_cJSON_file(template_content, template_length, context, Mustach_With_AllExtensions, output_stream);
+    int ret = mustach_cJSON_file(template.value, template.length, context, Mustach_With_AllExtensions, output_stream);
     fflush(output_stream);
     fclose(output_stream);
 
@@ -567,8 +607,10 @@ char* render_mustache(char *template_content, size_t template_length, cJSON *con
     if (ret != MUSTACH_OK) {
         fprintf(stderr, "Mustach processing error: %d\n", ret);
         if (output) free(output);
-        return template_content;
+    } else {
+        result.value = output;
+        result.length = output_size;
     }
 
-    return  output;
+    return  result;
 }
