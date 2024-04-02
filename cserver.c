@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,6 +78,8 @@ void add_request(cJSON *context, char *method, char *request_path, char *resourc
 
 void add_object(cJSON *context, char *name, cJSON *object);
 
+int read_int(cJSON *config, char *name, int default_value);
+
 string render_page(cJSON *context, char *path);
 
 const char* get_content_type(char *request_path, char *resource_path);
@@ -109,6 +112,7 @@ int main(int argc, char **argv) {
         config = cJSON_Parse(config_content.value);
         string_free(config_content);
     }
+    int port = read_int(config, "port", PORT);
 
     // Create socket descriptor
     // man socket(2)
@@ -118,7 +122,7 @@ int main(int argc, char **argv) {
     struct sockaddr_in address;
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    address.sin_port = htons(port);
 
     socklen_t address_len = sizeof(address);
 
@@ -410,6 +414,14 @@ void add_object(cJSON *context, char *name, cJSON *object) {
         o = cJSON_CreateObject();
     }
     cJSON_AddItemToObject(context, name, o);
+}
+
+int read_int(cJSON *config, char *name, int default_value) {
+    cJSON *object = cJSON_GetObjectItem(config, name);
+    if (object == NULL) return default_value;
+    double value = cJSON_GetNumberValue(object);
+    if (isnan(value)) return default_value;
+    return (int)value; 
 }
 
 string render_page(cJSON *context, char *path) {
