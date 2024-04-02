@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,7 +74,11 @@ void serve_file(int socket, char *filename);
 
 char* resource_path(char *request_path);
 
-cJSON* make_context(char *method, char *request_path, char *resource_path);
+void add_request(cJSON *context, char *method, char *request_path, char *resource_path);
+
+void add_object(cJSON *context, char *name, cJSON *object);
+
+int read_int(cJSON *config, char *name, int default_value);
 
 string render_page(cJSON *context, char *path);
 
@@ -100,6 +105,15 @@ int main(int argc, char **argv) {
     // Request url length
     const size_t url_len = 1024;
 
+    // Read configuration
+    cJSON *config = NULL;
+    string config_content = read_file("config.json");
+    if (config_content.value != NULL) {
+        config = cJSON_Parse(config_content.value);
+        string_free(config_content);
+    }
+    int port = read_int(config, "port", PORT);
+
     // Create socket descriptor
     // man socket(2)
     int server_desc = socket(PF_INET, SOCK_STREAM, IPPROTO_IP);
@@ -108,7 +122,7 @@ int main(int argc, char **argv) {
     struct sockaddr_in address;
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    address.sin_port = htons(port);
 
     socklen_t address_len = sizeof(address);
 
@@ -159,7 +173,9 @@ int main(int argc, char **argv) {
         char filename[url_len];
         char *path = resource_path(url);
 
-        cJSON *context = make_context(method, url, path);
+        cJSON *context = cJSON_CreateObject();
+        add_request(context, method, url, path);
+        add_object(context, "config", config);
 
         string content;
         string response;
@@ -381,9 +397,7 @@ const char* get_content_type(char *request_path, char *resource_path) {
     }
 }
 
-cJSON* make_context(char *method, char *request_path, char *resource_path) {
-    cJSON *context = cJSON_CreateObject();
-    // request
+void add_request(cJSON *context, char *method, char *request_path, char *resource_path) {
     cJSON *request = cJSON_CreateObject();
     cJSON *request_method = cJSON_CreateString(method);
     cJSON_AddItemToObject(request, "method", request_method);
@@ -392,7 +406,22 @@ cJSON* make_context(char *method, char *request_path, char *resource_path) {
     cJSON *request_resource_path = cJSON_CreateString(resource_path);
     cJSON_AddItemToObject(request, "resourcePath", request_resource_path);
     cJSON_AddItemToObject(context, "request", request);
-    return context;
+}
+
+void add_object(cJSON *context, char *name, cJSON *object) {
+    cJSON *o = object;
+    if (o == NULL) {
+        o = cJSON_CreateObject();
+    }
+    cJSON_AddItemToObject(context, name, o);
+}
+
+int read_int(cJSON *config, char *name, int default_value) {
+    cJSON *object = cJSON_GetObjectItem(config, name);
+    if (object == NULL) return default_value;
+    double value = cJSON_GetNumberValue(object);
+    if (isnan(value)) return default_value;
+    return (int)value; 
 }
 
 string render_page(cJSON *context, char *path) {
