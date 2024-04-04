@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 
         // Parse the request and send a response
         char buffer[buffer_len] = {0};
-		long recv_result = recv(socket_desc, buffer, buffer_len, 0);
+        long recv_result = recv(socket_desc, buffer, buffer_len, 0);
         if (recv_result < 0) {
             perror("recv failed");
             exit(EXIT_FAILURE);
@@ -90,12 +90,11 @@ int main(int argc, char **argv) {
         printf("%s\n", buffer);
         printf("--------------------------------\n");
 
-		// Parse the request
-		char method[method_len];
-		char url[url_len];
-		sscanf(buffer, "%s %s", method, url);
-		printf("Method: %s\nURL: %s\n", method, url);
-        char filename[url_len];
+        // Parse the request
+        char method[method_len];
+        char url[url_len];
+        sscanf(buffer, "%s %s", method, url);
+        printf("Method: %s\nURL: %s\n", method, url);
         char *path = resource_path(url);
 
         cJSON *context = cJSON_CreateObject();
