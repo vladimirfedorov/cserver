@@ -7,7 +7,7 @@ cserver.o: cserver.c
 	clang -I. --analyze cserver.c
 	cc -Wall -I. -c cserver.c
 
-# md4c redefines OFF_MAX as (sizeof(OFF) == 8 ? UINT64_MAX : UINT32_MAX); macOS SDK defeintion is LLONG_MAX
+# md4c redefines OFF_MAX as (sizeof(OFF) == 8 ? UINT64_MAX : UINT32_MAX); macOS SDK definition is LLONG_MAX
 md4c.o: md4c/src/md4c.c
 	cc -c md4c/src/md4c.c -Wno-macro-redefined
 
