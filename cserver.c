@@ -441,7 +441,7 @@ substring skip_metadata(string input_content, cJSON *metadata) {
                 result.value = next_line + 1;
                 result.length -= result.value - input_content.value;
                 // Return the pointer to the beginning of markdown content
-                printf("input_content.length = %li, result.length = %li\n", input_content.length, result.length);
+                // printf("input_content.length = %li, result.length = %li\n", input_content.length, result.length);
                 return result;
             }
 
