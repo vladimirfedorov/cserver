@@ -21,6 +21,7 @@ const char *content_type_text = "text/plain";
 const char *content_type_html = "text/html";
 const char *content_type_json = "application/json";
 
+#ifndef CSERVER_TEST                // Exlude main from test target
 int main(int argc, char **argv) {
 
     // Request data buffer length
@@ -137,6 +138,7 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+#endif
 
 /**
  * String Functions
@@ -512,7 +514,7 @@ int load_partial(const char *name, struct mustach_sbuf *sbuf) {
     
     if (!file) {
         // Return an error if the file cannot be opened
-        printf("Partial %s not found.\n", filename);
+        // printf("Partial %s not found.\n", filename);
         return -1;
     }
     
@@ -538,7 +540,7 @@ string load_template(char* name) {
     snprintf(filename, sizeof(filename), "templates/%s.mustache", name);
     string template = read_file(filename);
     if (template.value == NULL) {
-        printf("Tempalte %s not found.\n", filename);
+        // printf("Tempalte %s not found.\n", filename);
     }
     return template;
 }
@@ -551,7 +553,6 @@ string render_mustache(string template_content, cJSON *context) {
     FILE* output_stream = open_memstream(&output, &output_size);
 
     // Perform the mustach processing
-    printf("Rendering template...\n");
     int ret = mustach_cJSON_file(template_content.value, template_content.length, context, Mustach_With_AllExtensions, output_stream);
     fflush(output_stream);
     fclose(output_stream);
