@@ -1,2 +1,4 @@
 cserver
+cserver-tests
 *.o
+*.plist
