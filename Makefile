@@ -1,6 +1,6 @@
 FLAGS = 
 
-objects = cserver.o md4c.o md4c-html.o entity.o cjson.o mustach.o mustach-wrap.o mustach-cjson.o
+objects = cserver.o md4c.o md4c-html.o entity.o cJSON.o mustach.o mustach-wrap.o mustach-cjson.o
 
 cserver: $(objects)
 	cc $(FLAGS) -o cserver $(objects)
@@ -25,7 +25,7 @@ md4c-html.o: md4c/src/md4c-html.c
 entity.o: md4c/src/entity.c
 	cc -c md4c/src/entity.c
 
-cjson.o: cjson/cJSON.c
+cJSON.o: cjson/cJSON.c
 	cc -c cjson/cJSON.c
 
 mustach.o: mustach/mustach.c
