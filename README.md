@@ -1,5 +1,7 @@
 # cserver
 
+[![Unit Tests](https://github.com/vladimirfedorov/cserver/actions/workflows/run-tests.yml/badge.svg)](https://github.com/vladimirfedorov/cserver/actions/workflows/run-tests.yml)
+
 The idea is to build a web server in C that:
 
 - [x] Serves static files from the `static` folder.
