@@ -101,6 +101,7 @@ int print_help() {
     printf("  cserver list          List all servers\n");
     printf("  cserver stop <id>     Stop server with <id>\n");
     printf("  cserver               Print this help\n");
+    return 0;
 }
 
 int start_server(char* path) {
