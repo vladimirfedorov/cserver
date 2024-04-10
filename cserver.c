@@ -23,7 +23,87 @@ const char *content_type_json = "application/json";
 
 #ifndef CSERVER_TEST                // Exlude main from test target
 int main(int argc, char **argv) {
+    if (argc < 2) {
+        print_help();
+    } else if (argc == 3 && strcmp(argv[1], "start") == 0) {
+        return start_server(argv[2]);
+    } else if (strcmp(argv[1], "list") == 0) {
+        return list_servers();
+    } else if (argc == 3 && strcmp(argv[1], "stop") == 0) {
+        return stop_server(argv[2]);
+    } else {
+        print_help();
+    }
+    return 0;
+}
+#endif
 
+/**
+ * String Functions
+ */
+
+string string_make(const char* value) {
+    size_t value_length = strlen(value);
+    string result = { .value = malloc(value_length + 1), .length = value_length };
+    strcpy(result.value, value);
+    return result;
+}
+
+void string_free(string str) {
+    if (str.value) free(str.value);
+}
+
+string read_file(const char *filename) {
+    string result = { .value = NULL, .length = 0};
+
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL)  return result;
+    
+    // File size
+    fseek(file, 0, SEEK_END);
+    long file_length = ftell(file);
+    if (file_length == -1) {
+        perror("Failed to determine file size");
+        fclose(file);
+        return result;
+    }
+    rewind(file);
+
+    // Allocate memory for file content
+    char *content = (char *)malloc(file_length + 1); // +1 for the null terminator
+    if (content == NULL) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return result;
+    }
+
+    // Read file into memory
+    if (fread(content, sizeof(char), file_length, file) < file_length) {
+        perror("Failed to read the file");
+        free(content);
+        fclose(file);
+        return result;
+    }
+    content[file_length] = '\0'; // Null-terminate the string
+
+    // Close the file
+    fclose(file);
+
+    result.value = content;
+    result.length = file_length;
+
+    return result;
+}
+
+int print_help() {
+    printf("Usage: \n");
+    printf("  cserver start <path>  Start new server at <path>\n");
+    printf("  cserver list          List all servers\n");
+    printf("  cserver stop <id>     Stop server with <id>\n");
+    printf("  cserver               Print this help\n");
+}
+
+int start_server(char* path) {
     // Request data buffer length
     const size_t buffer_len = 4096;
     // HTTP method length
@@ -126,7 +206,7 @@ int main(int argc, char **argv) {
 
         int send_result = send(socket_desc, response.value, response.length, 0);
         if (send_result < 0) {
-            perror("send failed.");
+            perror("send failed.\n");
             exit(EXIT_FAILURE);
         }
         string_free(content);
@@ -135,66 +215,16 @@ int main(int argc, char **argv) {
         // Close the connection
         close(socket_desc);
     }
-
-    return 0;
-}
-#endif
-
-/**
- * String Functions
- */
-
-string string_make(const char* value) {
-    size_t value_length = strlen(value);
-    string result = { .value = malloc(value_length + 1), .length = value_length };
-    strcpy(result.value, value);
-    return result;
 }
 
-void string_free(string str) {
-    if (str.value) free(str.value);
+int list_servers() {
+    perror("Not Implemented.\n");
+    return 1;
 }
 
-string read_file(const char *filename) {
-    string result = { .value = NULL, .length = 0};
-
-    FILE *file = fopen(filename, "rb");
-    if (file == NULL)  return result;
-    
-    // File size
-    fseek(file, 0, SEEK_END);
-    long file_length = ftell(file);
-    if (file_length == -1) {
-        perror("Failed to determine file size");
-        fclose(file);
-        return result;
-    }
-    rewind(file);
-
-    // Allocate memory for file content
-    char *content = (char *)malloc(file_length + 1); // +1 for the null terminator
-    if (content == NULL) {
-        perror("Failed to allocate memory");
-        fclose(file);
-        return result;
-    }
-
-    // Read file into memory
-    if (fread(content, sizeof(char), file_length, file) < file_length) {
-        perror("Failed to read the file");
-        free(content);
-        fclose(file);
-        return result;
-    }
-    content[file_length] = '\0'; // Null-terminate the string
-
-    // Close the file
-    fclose(file);
-
-    result.value = content;
-    result.length = file_length;
-
-    return result;
+int stop_server(char *id) {
+    perror("Not Implemented.\n");
+    return 1;
 }
 
 
