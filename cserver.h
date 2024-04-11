@@ -25,14 +25,23 @@
 // Strings
 struct cstring {
     char *value;
-    long length;
+    size_t length;
 };
 typedef struct cstring string;      // call string_free
 typedef struct cstring substring;   // do not free
 
+string string_init();
 string string_make(const char* value);
 void string_free(string str);
 string read_file(const char *filename);
+
+/**
+ * cserver management functions
+ */
+int print_help();
+int start_server(char* path);
+int list_servers();
+int stop_server(char *id);
 
 /**
  * Generates an HTTP response string.
