@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -34,13 +35,17 @@ int main(int argc, char **argv) {
     } else {
         print_help();
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 #endif
 
 /**
  * String Functions
  */
+
+string string_init() {
+    return (string){ .value = NULL, .length = 0 };
+}
 
 string string_make(const char* value) {
     size_t value_length = strlen(value);
@@ -54,7 +59,7 @@ void string_free(string str) {
 }
 
 string read_file(const char *filename) {
-    string result = { .value = NULL, .length = 0};
+    string result = string_init();
 
     FILE *file = fopen(filename, "rb");
     if (file == NULL)  return result;
@@ -101,10 +106,43 @@ int print_help() {
     printf("  cserver list          List all servers\n");
     printf("  cserver stop <id>     Stop server with <id>\n");
     printf("  cserver               Print this help\n");
-    return 0;
+    return EXIT_SUCCESS;
+}
+
+void daemonize(char *path) {
+    pid_t pid;
+
+    // Fork off the parent process
+    pid = fork();
+    if (pid < 0) exit(EXIT_FAILURE);
+    // If we got a good PID, exit the parent process
+    if (pid > 0) exit(EXIT_SUCCESS);
+
+    // Change the file mode mask
+    umask(0);
+
+    // Create a new SID for the child process
+    if (setsid() < 0) {
+        perror("Failed SID");
+        exit(EXIT_FAILURE);
+    }
+
+    // Change the current working directory
+    if ((chdir(path)) < 0) {
+        perror("Failed path\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Close out the standard file descriptors
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
 }
 
 int start_server(char* path) {
+
+    daemonize(path);
+
     // Request data buffer length
     const size_t buffer_len = 4096;
     // HTTP method length
@@ -183,8 +221,8 @@ int start_server(char* path) {
         add_request(context, method, url, path);
         add_object(context, "config", config);
 
-        string content;
-        string response;
+        string content = string_init();
+        string response = string_init();
 
         if (path != NULL) {
             const char *content_type = get_content_type(url, path);
@@ -219,13 +257,30 @@ int start_server(char* path) {
 }
 
 int list_servers() {
-    perror("Not Implemented.\n");
-    return 1;
+    FILE *fp;
+    char result[1024];
+    fp = popen("pgrep cserver", "r");
+    if (fp == NULL) {
+        printf("Failed to run command\n" );
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Running instances:\n");
+    while (fgets(result, sizeof(result)-1, fp) != NULL) {
+        printf("%s", result);
+    }
+
+    pclose(fp);
+    return EXIT_SUCCESS;
 }
 
 int stop_server(char *id) {
-    perror("Not Implemented.\n");
-    return 1;
+    int pid = atoi(id);
+    if (kill(pid, SIGTERM) == -1) {
+        perror("Error sending SIGTERM");
+        exit(EXIT_FAILURE);
+    }
+    return EXIT_SUCCESS;
 }
 
 
@@ -241,7 +296,7 @@ int stop_server(char *id) {
  *         Returns NULL if memory allocation fails.
  */
 string make_response(char *http_status, const char *content_type, string content) {
-    string result = { .value = NULL, .length = 0 };
+    string result = string_init();
     // Calculate the lengths of various parts of the HTTP response
     // CRLF is the standard line break (https://www.w3.org/MarkUp/html-spec/html-spec_8.html#SEC8.2.1)
     int status_line_length = snprintf(NULL, 0, "HTTP/1.1 %s\r\n", http_status);
@@ -518,8 +573,8 @@ void output_callback(const MD_CHAR* text, MD_SIZE size, void* userdata) {
 }
 
 string render_markdown(string markdown_content) {
-    html_buffer buf = {0};
-    string result = { .value = NULL, .length = 0 };
+    html_buffer buf = { .output = NULL, .size = 0 };
+    string result = string_init();
 
     // Parse Markdown to HTML
     if (md_html(markdown_content.value, markdown_content.length, output_callback, &buf, MD_DIALECT_GITHUB, 0) != 0) {
