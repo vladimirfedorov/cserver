@@ -199,7 +199,8 @@ int start_server(char* path) {
         }
 
         // Parse the request and send a response
-        char buffer[buffer_len] = {0};
+        char buffer[buffer_len];
+        memset(buffer, 0, buffer_len);
         long recv_result = recv(socket_desc, buffer, buffer_len, 0);
         if (recv_result < 0) {
             perror("recv failed");
