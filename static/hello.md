@@ -1,7 +1,7 @@
 ---
-# template: custom
-title: Page title
-author: Anonymous
+  template  : custom
+  title     :  Page title
+  author	:   Anonymous
 ---
 
 # H1
