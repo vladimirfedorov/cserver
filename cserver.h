@@ -39,7 +39,7 @@ string read_file(const char *filename);
  * cserver management functions
  */
 int print_help();
-int start_server(char* path);
+int start_server(char* path, bool cli_mode);
 int list_servers();
 int stop_server(char *id);
 

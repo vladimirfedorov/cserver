@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 // Markdown
 #include "md4c/src/md4c-html.h"
@@ -26,8 +27,10 @@ const char *content_type_json = "application/json";
 int main(int argc, char **argv) {
     if (argc < 2) {
         print_help();
+    } else if (argc == 3 && strcmp(argv[1], "run") == 0) {
+        return start_server(argv[2], true);
     } else if (argc == 3 && strcmp(argv[1], "start") == 0) {
-        return start_server(argv[2]);
+        return start_server(argv[2], false);
     } else if (strcmp(argv[1], "list") == 0) {
         return list_servers();
     } else if (argc == 3 && strcmp(argv[1], "stop") == 0) {
@@ -102,6 +105,7 @@ string read_file(const char *filename) {
 
 int print_help() {
     printf("Usage: \n");
+    printf("  cserver run <path>    Run new server in console\n");
     printf("  cserver start <path>  Start new server at <path>\n");
     printf("  cserver list          List all servers\n");
     printf("  cserver stop <id>     Stop server with <id>\n");
@@ -139,9 +143,13 @@ void daemonize(char *path) {
     close(STDERR_FILENO);
 }
 
-int start_server(char* path) {
+int start_server(char* path, bool cli_mode) {
 
-    daemonize(path);
+    if (cli_mode) {
+        chdir(path);
+    } else {
+        daemonize(path);
+    }
 
     // Request data buffer length
     const size_t buffer_len = 4096;
@@ -276,6 +284,7 @@ int list_servers() {
 }
 
 int stop_server(char *id) {
+    // TODO: Make sure it kills only cserevr processes
     int pid = atoi(id);
     if (kill(pid, SIGTERM) == -1) {
         perror("Error sending SIGTERM");
