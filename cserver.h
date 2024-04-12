@@ -43,6 +43,9 @@ int start_server(char* path, bool cli_mode);
 int list_servers();
 int stop_server(char *id);
 
+
+void collect_metadata(char *path, cJSON *metadata);
+
 /**
  * Generates an HTTP response string.
  *

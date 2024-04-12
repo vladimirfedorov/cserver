@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <stdbool.h>
 
 // Markdown
@@ -167,6 +168,12 @@ int start_server(char* path, bool cli_mode) {
     }
     int port = read_int(config, "port", PORT);
 
+    // Metadata
+    char pages_path[MAX_PATH_LEN];
+    snprintf(pages_path, MAX_PATH_LEN, "%s/static", path);
+    cJSON *site_metadata = cJSON_CreateObject();
+    collect_metadata(pages_path, site_metadata);
+    
     // Create socket descriptor
     // man socket(2)
     int server_desc = socket(PF_INET, SOCK_STREAM, IPPROTO_IP);
@@ -229,6 +236,8 @@ int start_server(char* path, bool cli_mode) {
         cJSON *context = cJSON_CreateObject();
         add_request(context, method, url, path);
         add_object(context, "config", config);
+
+        add_object(context, "site", site_metadata);
 
         string content = string_init();
         string response = string_init();
@@ -293,6 +302,86 @@ int stop_server(char *id) {
     return EXIT_SUCCESS;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+void store_metadata(char *key, char *value, char *filename, cJSON *metadata) {
+    // printf("store_metadata %s: \"%s\"=\"%s\"\n", filename, key, value);
+}
+
+// Trims string in place
+char * trim_whitespace(char *str) {
+    char *end;
+    // Leading spaces
+    while (isspace((unsigned char)*str)) str++;
+    if (*str == 0) return str; // end of line
+    // trailing spaces
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+    // new end of string
+    *(end+1) = 0;
+    return str;
+}
+
+void process_file(const char *filename, cJSON *metadata) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Failed to open file");
+        return;
+    }
+
+    char line[1024];
+    int metadata_section = 0;
+    while (fgets(line, sizeof(line), file)) {
+        if (strcmp(line, "---\n") == 0) {
+            metadata_section = !metadata_section;  // Toggle metadata section state
+            if (!metadata_section)  // End of metadata section
+                break;
+        } else if (metadata_section) {
+            char *colon = strchr(line, ':');
+            if (colon) {
+                *colon = '\0';  // Split the string into key and value
+                char *key = line;
+                char *value = colon + 1;
+                key = trim_whitespace(key);
+                value = trim_whitespace(value);
+                store_metadata(key, value, (char *)filename, metadata);
+            }
+        }
+    }
+
+    fclose(file);
+}
+
+void collect_metadata(char *path, cJSON *metadata) {
+    DIR *dir = opendir(path);
+    if (!dir) {
+        perror("Failed to open directory");
+        return;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type == DT_DIR) {
+            char next_path[1024];
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+
+            snprintf(next_path, sizeof(next_path), "%s/%s", path, entry->d_name);
+            collect_metadata(next_path, metadata);  // Recursively call on subdirectory
+        } else if (entry->d_type == DT_REG) {
+            char *dot = strrchr(entry->d_name, '.');
+            if (dot && strcmp(dot, ".md") == 0) {
+                char filepath[1024];
+                snprintf(filepath, sizeof(filepath), "%s/%s", path, entry->d_name);
+                process_file(filepath, metadata);
+            }
+        }
+    }
+
+    closedir(dir);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * Generates an HTTP response string.
