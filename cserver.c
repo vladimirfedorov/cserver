@@ -546,8 +546,10 @@ string render_page(cJSON *context, char *path) {
         cJSON *page_metadata = cJSON_CreateObject();
         substring markdown_content = skip_metadata(file_content, page_metadata);
         cJSON_AddItemToObject(context, "page", page_metadata);
-        string md_html_content = render_markdown(markdown_content);
+        string md_expanded_content = render_mustache(markdown_content, context);
+        string md_html_content = render_markdown(md_expanded_content);
         string_free(file_content);
+        string_free(md_expanded_content);
         
         // context.content = rendered markdown data
         cJSON *content = cJSON_CreateString(md_html_content.value);
