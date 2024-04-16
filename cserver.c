@@ -570,9 +570,6 @@ string render_page(cJSON *context, char *path) {
         // Render mustache template with the provided content
         string html_content = render_mustache(template, context);
         string_free(template);
-        if (page_metadata) cJSON_free(page_metadata);
-        if (page_template_object) cJSON_free(page_template_object);
-        if (content) cJSON_free(content);
 
         return html_content;
 
