@@ -259,6 +259,9 @@ int start_server(char* path, bool cli_mode) {
             }
         }
 
+        // char *context_value = cJSON_Print(context);
+        // printf("Context:\n%s\n", context_value);
+        // free(context_value);
         cJSON_free(context);
 
         int send_result = send(socket_desc, response.value, response.length, 0);
@@ -304,10 +307,6 @@ int stop_server(char *id) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void store_metadata(char *key, char *value, char *filename, cJSON *metadata) {
-    // printf("store_metadata %s: \"%s\"=\"%s\"\n", filename, key, value);
-}
-
 // Trims string in place
 char * trim_whitespace(char *str) {
     char *end;
@@ -320,6 +319,36 @@ char * trim_whitespace(char *str) {
     // new end of string
     *(end+1) = 0;
     return str;
+}
+
+void store_metadata(char *key, char *value, char *filename, cJSON *metadata) {
+    if (!cJSON_HasObjectItem(metadata, key)) {
+        cJSON_AddObjectToObject(metadata, key);
+    }
+    cJSON *key_json = cJSON_GetObjectItem(metadata, key);
+
+    if (strcmp(key, "slug") == 0) {                             // "slug": { "slug-value": "filename" }
+        cJSON_AddStringToObject(key_json, value, filename);     
+    } else if (strcmp(key, "published") == 0) {                 // "published": { "filename": "date" }
+        cJSON_AddStringToObject(key_json, filename, value);     
+    } else if (strcmp(key, "tags") == 0) {                      // "tags": { "name": ["filename", ...]  }
+        char *tag = strtok(value, ",");
+        while (tag != NULL) {
+            trim_whitespace(tag);
+            if (!cJSON_HasObjectItem(key_json, tag)) {
+                cJSON_AddArrayToObject(key_json, tag);
+            }
+            cJSON *tag_array = cJSON_GetObjectItem(key_json, tag);
+            cJSON_AddItemToArray(tag_array, cJSON_CreateString(filename));
+            tag = strtok(NULL, ",");
+        }
+    } else {                                                    // "category": { "name": ["filename", ...]},
+        if (!cJSON_HasObjectItem(key_json, value)) {            // "author": { "name": ["filename", ...] }, ...
+            cJSON_AddArrayToObject(key_json, value);
+        }
+        cJSON *value_array = cJSON_GetObjectItem(key_json, value);
+        cJSON_AddItemToArray(value_array, cJSON_CreateString(filename));
+    }
 }
 
 void process_file(const char *filename, cJSON *metadata) {
