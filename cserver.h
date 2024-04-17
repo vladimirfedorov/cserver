@@ -1,6 +1,7 @@
 #ifndef CSERVER_H
 #define CSERVER_H
 
+#include <stdbool.h>
 #include "cjson/cJSON.h"
 
 #ifdef __cplusplus

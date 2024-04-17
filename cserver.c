@@ -9,7 +9,6 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <stdbool.h>
 
 // Markdown
 #include "md4c/src/md4c-html.h"
