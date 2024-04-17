@@ -1,6 +1,7 @@
 #ifndef CSERVER_H
 #define CSERVER_H
 
+#include <stdbool.h>
 #include "cjson/cJSON.h"
 
 #ifdef __cplusplus
@@ -39,9 +40,12 @@ string read_file(const char *filename);
  * cserver management functions
  */
 int print_help();
-int start_server(char* path);
+int start_server(char* path, bool cli_mode);
 int list_servers();
 int stop_server(char *id);
+
+
+void collect_metadata(char *path, cJSON *metadata);
 
 /**
  * Generates an HTTP response string.

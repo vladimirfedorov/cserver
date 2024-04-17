@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <dirent.h>
 
 // Markdown
 #include "md4c/src/md4c-html.h"
@@ -26,8 +27,10 @@ const char *content_type_json = "application/json";
 int main(int argc, char **argv) {
     if (argc < 2) {
         print_help();
+    } else if (argc == 3 && strcmp(argv[1], "run") == 0) {
+        return start_server(argv[2], true);
     } else if (argc == 3 && strcmp(argv[1], "start") == 0) {
-        return start_server(argv[2]);
+        return start_server(argv[2], false);
     } else if (strcmp(argv[1], "list") == 0) {
         return list_servers();
     } else if (argc == 3 && strcmp(argv[1], "stop") == 0) {
@@ -102,6 +105,7 @@ string read_file(const char *filename) {
 
 int print_help() {
     printf("Usage: \n");
+    printf("  cserver run <path>    Run new server in console\n");
     printf("  cserver start <path>  Start new server at <path>\n");
     printf("  cserver list          List all servers\n");
     printf("  cserver stop <id>     Stop server with <id>\n");
@@ -139,9 +143,13 @@ void daemonize(char *path) {
     close(STDERR_FILENO);
 }
 
-int start_server(char* path) {
+int start_server(char* path, bool cli_mode) {
 
-    daemonize(path);
+    if (cli_mode) {
+        chdir(path);
+    } else {
+        daemonize(path);
+    }
 
     // Request data buffer length
     const size_t buffer_len = 4096;
@@ -159,6 +167,12 @@ int start_server(char* path) {
     }
     int port = read_int(config, "port", PORT);
 
+    // Metadata
+    char pages_path[MAX_PATH_LEN];
+    snprintf(pages_path, MAX_PATH_LEN, "%s/static", path);
+    cJSON *site_metadata = cJSON_CreateObject();
+    collect_metadata(pages_path, site_metadata);
+    
     // Create socket descriptor
     // man socket(2)
     int server_desc = socket(PF_INET, SOCK_STREAM, IPPROTO_IP);
@@ -222,6 +236,8 @@ int start_server(char* path) {
         add_request(context, method, url, path);
         add_object(context, "config", config);
 
+        add_object(context, "site", site_metadata);
+
         string content = string_init();
         string response = string_init();
 
@@ -242,6 +258,9 @@ int start_server(char* path) {
             }
         }
 
+        // char *context_value = cJSON_Print(context);
+        // printf("Context:\n%s\n", context_value);
+        // free(context_value);
         cJSON_free(context);
 
         int send_result = send(socket_desc, response.value, response.length, 0);
@@ -276,6 +295,7 @@ int list_servers() {
 }
 
 int stop_server(char *id) {
+    // TODO: Make sure it kills only cserevr processes
     int pid = atoi(id);
     if (kill(pid, SIGTERM) == -1) {
         perror("Error sending SIGTERM");
@@ -284,6 +304,112 @@ int stop_server(char *id) {
     return EXIT_SUCCESS;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+// Trims string in place
+char * trim_whitespace(char *str) {
+    char *end;
+    // Leading spaces
+    while (isspace((unsigned char)*str)) str++;
+    if (*str == 0) return str; // end of line
+    // trailing spaces
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+    // new end of string
+    *(end+1) = 0;
+    return str;
+}
+
+void store_metadata(char *key, char *value, char *filename, cJSON *metadata) {
+    if (!cJSON_HasObjectItem(metadata, key)) {
+        cJSON_AddObjectToObject(metadata, key);
+    }
+    cJSON *key_json = cJSON_GetObjectItem(metadata, key);
+
+    if (strcmp(key, "slug") == 0) {                             // "slug": { "slug-value": "filename" }
+        cJSON_AddStringToObject(key_json, value, filename);     
+    } else if (strcmp(key, "published") == 0) {                 // "published": { "filename": "date" }
+        cJSON_AddStringToObject(key_json, filename, value);     
+    } else if (strcmp(key, "tags") == 0) {                      // "tags": { "name": ["filename", ...]  }
+        char *tag = strtok(value, ",");
+        while (tag != NULL) {
+            trim_whitespace(tag);
+            if (!cJSON_HasObjectItem(key_json, tag)) {
+                cJSON_AddArrayToObject(key_json, tag);
+            }
+            cJSON *tag_array = cJSON_GetObjectItem(key_json, tag);
+            cJSON_AddItemToArray(tag_array, cJSON_CreateString(filename));
+            tag = strtok(NULL, ",");
+        }
+    } else {                                                    // "category": { "name": ["filename", ...]},
+        if (!cJSON_HasObjectItem(key_json, value)) {            // "author": { "name": ["filename", ...] }, ...
+            cJSON_AddArrayToObject(key_json, value);
+        }
+        cJSON *value_array = cJSON_GetObjectItem(key_json, value);
+        cJSON_AddItemToArray(value_array, cJSON_CreateString(filename));
+    }
+}
+
+void process_file(const char *filename, cJSON *metadata) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Failed to open file");
+        return;
+    }
+
+    char line[1024];
+    int metadata_section = 0;
+    while (fgets(line, sizeof(line), file)) {
+        if (strcmp(line, "---\n") == 0) {
+            metadata_section = !metadata_section;  // Toggle metadata section state
+            if (!metadata_section)  // End of metadata section
+                break;
+        } else if (metadata_section) {
+            char *colon = strchr(line, ':');
+            if (colon) {
+                *colon = '\0';  // Split the string into key and value
+                char *key = line;
+                char *value = colon + 1;
+                key = trim_whitespace(key);
+                value = trim_whitespace(value);
+                store_metadata(key, value, (char *)filename, metadata);
+            }
+        }
+    }
+
+    fclose(file);
+}
+
+void collect_metadata(char *path, cJSON *metadata) {
+    DIR *dir = opendir(path);
+    if (!dir) {
+        perror("Failed to open directory");
+        return;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type == DT_DIR) {
+            char next_path[1024];
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+
+            snprintf(next_path, sizeof(next_path), "%s/%s", path, entry->d_name);
+            collect_metadata(next_path, metadata);  // Recursively call on subdirectory
+        } else if (entry->d_type == DT_REG) {
+            char *dot = strrchr(entry->d_name, '.');
+            if (dot && strcmp(dot, ".md") == 0) {
+                char filepath[1024];
+                snprintf(filepath, sizeof(filepath), "%s/%s", path, entry->d_name);
+                process_file(filepath, metadata);
+            }
+        }
+    }
+
+    closedir(dir);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 /**
  * Generates an HTTP response string.
@@ -448,8 +574,10 @@ string render_page(cJSON *context, char *path) {
         cJSON *page_metadata = cJSON_CreateObject();
         substring markdown_content = skip_metadata(file_content, page_metadata);
         cJSON_AddItemToObject(context, "page", page_metadata);
-        string md_html_content = render_markdown(markdown_content);
+        string md_expanded_content = render_mustache(markdown_content, context);
+        string md_html_content = render_markdown(md_expanded_content);
         string_free(file_content);
+        string_free(md_expanded_content);
         
         // context.content = rendered markdown data
         cJSON *content = cJSON_CreateString(md_html_content.value);
@@ -470,9 +598,6 @@ string render_page(cJSON *context, char *path) {
         // Render mustache template with the provided content
         string html_content = render_mustache(template, context);
         string_free(template);
-        if (page_metadata) cJSON_free(page_metadata);
-        if (page_template_object) cJSON_free(page_template_object);
-        if (content) cJSON_free(content);
 
         return html_content;
 
@@ -547,6 +672,7 @@ substring skip_metadata(string input_content, cJSON *metadata) {
             line = next_line + 1;
         }
         // If we are here, it means the page has no content, just metadata.
+        result.value = input_content.value + input_content.length;
         result.length = 0;
         return result;
     }
