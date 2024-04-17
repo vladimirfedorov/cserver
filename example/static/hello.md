@@ -8,11 +8,17 @@ published: 2024-01-11 20:00:00
 
 # Hello Page
 
+## Site configuration:
+
+{{#config}}
+Title: {{title}}
+Keywords: {{keywords}}
+{{/config}}
+
 ## Site metadata:
 
 {{#site}}
-Title: {{title}}
-Keywords: {{keywords}}
+{{.}}
 {{/site}}
 
 ## Page metadata:
