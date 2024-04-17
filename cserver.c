@@ -672,6 +672,7 @@ substring skip_metadata(string input_content, cJSON *metadata) {
             line = next_line + 1;
         }
         // If we are here, it means the page has no content, just metadata.
+        result.value = input_content.value + input_content.length;
         result.length = 0;
         return result;
     }
