@@ -42,9 +42,7 @@ int main(int argc, char **argv) {
 }
 #endif
 
-/**
- * String Functions
- */
+// String Functions ///////////////////////////////////////////////////////////
 
 string string_init() {
     return (string){ .value = NULL, .length = 0 };
@@ -102,6 +100,8 @@ string read_file(const char *filename) {
 
     return result;
 }
+
+// Server management functions ////////////////////////////////////////////////
 
 int print_help() {
     printf("Usage: \n");
@@ -165,6 +165,8 @@ int start_server(char* path, bool cli_mode) {
         config = cJSON_Parse(config_content.value);
         string_free(config_content);
     }
+    if (config == NULL) config = cJSON_CreateObject();
+
     int port = read_int(config, "port", PORT);
 
     // Metadata
@@ -234,9 +236,8 @@ int start_server(char* path, bool cli_mode) {
 
         cJSON *context = cJSON_CreateObject();
         add_request(context, method, url, path);
-        add_object(context, "config", config);
-
-        add_object(context, "site", site_metadata);
+        cJSON_AddItemToObject(context, "config", config);
+        cJSON_AddItemToObject(context, "site", site_metadata);
 
         string content = string_init();
         string response = string_init();
@@ -411,17 +412,6 @@ void collect_metadata(char *path, cJSON *metadata) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/**
- * Generates an HTTP response string.
- *
- * @param hhtp_status    HTTP status code and message.
- * @param content_type   The "Content-Type" header for the response.
- * @param content        The content to include in the response body.
- *
- * @return A pointer to the dynamically allocated HTTP response string.
- *         The caller is responsible for freeing the allocated memory using free().
- *         Returns NULL if memory allocation fails.
- */
 string make_response(char *http_status, const char *content_type, string content) {
     string result = string_init();
     // Calculate the lengths of various parts of the HTTP response
@@ -547,18 +537,10 @@ void add_request(cJSON *context, char *method, char *request_path, char *resourc
     cJSON_AddItemToObject(context, "request", request);
 }
 
-void add_object(cJSON *context, char *name, cJSON *object) {
-    cJSON *o = object;
-    if (o == NULL) {
-        o = cJSON_CreateObject();
-    }
-    cJSON_AddItemToObject(context, name, o);
-}
-
-int read_int(cJSON *config, char *name, int default_value) {
-    cJSON *object = cJSON_GetObjectItem(config, name);
-    if (object == NULL) return default_value;
-    double value = cJSON_GetNumberValue(object);
+int read_int(cJSON *object, char *name, int default_value) {
+    cJSON *value_object = cJSON_GetObjectItem(object, name);
+    if (value_object == NULL) return default_value;
+    double value = cJSON_GetNumberValue(value_object);
     if (isnan(value)) return default_value;
     return (int)value; 
 }
@@ -617,24 +599,9 @@ string render_page(cJSON *context, char *path) {
 }
 
 
-/**
- * Skips metadata and returns the pointer to markdown content inside input_content.
- * 
- * @param input_content     Markdown content with page metadata.
- * @param metadata          cJSON object for page metadata.
- * 
- * @return  A pointer to the beginning of markdown content.
- * 
- * All metadata parameters are stored in cJSON object.
- * New memory is not allocated here, free input_content only.
- * 
- * Expected metadata format:
- * ---
- * key: value
- * ---
- * <new line>
- * Markdown content
- */
+// Markdown ///////////////////////////////////////////////////////////////////
+
+
 substring skip_metadata(string input_content, cJSON *metadata) {
     substring result = { .value = input_content.value, .length = input_content.length };
     // Check if the first line is ---
@@ -678,8 +645,6 @@ substring skip_metadata(string input_content, cJSON *metadata) {
     }
 }
 
-// Markdown renderer
-
 typedef struct {
     char *output;
     size_t size;
@@ -715,9 +680,9 @@ string render_markdown(string markdown_content) {
     return result;
 }
 
-/*
- * Mustache templates
- */
+
+// Mustache ///////////////////////////////////////////////////////////////////
+
 
 int load_partial(const char *name, struct mustach_sbuf *sbuf) {
     // Example of opening a file named after the partial. Adjust path as necessary.
