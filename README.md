@@ -14,26 +14,26 @@ Ideally, the server should be able to serve static files in the `static` folder,
 
 ### Make
 
-```
+```sh
 ./scripts/make.sh
 ```
 
 ### Test
 
-```
+```sh
 ./scripts/test.sh
 ```
 
 
 ### Run
 
-```
+```sh
 ./cserver run /path/to/files
 ```
 
- - OR -
+--OR--
 
-```
+```sh
 # start as a service
 ./cserver start /path/to/files
 
