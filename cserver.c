@@ -239,19 +239,20 @@ int start_server(char* path, bool cli_mode) {
         cJSON_AddItemToObject(context, "config", config);
         cJSON_AddItemToObject(context, "site", site_metadata);
 
-        string content = string_init();
-        string response = string_init();
+        string response;
 
         if (path != NULL) {
             const char *content_type = get_content_type(url, path);
-            content = render_page(context, path);
+            string content = render_page(context, path);
             response = make_response(HTTP_STATUS_200, content_type, content);
+            string_free(content);
         } else {
             char *page_404_path = resource_path("/404");
             if (page_404_path != NULL) {
                 const char *content_type = get_content_type(url, page_404_path);
-                content = render_page(context, page_404_path);
+                string content = render_page(context, page_404_path);
                 response = make_response(HTTP_STATUS_404, content_type, content);
+                string_free(content);
             } else {
                 string not_found = string_make("File not found.");
                 response = make_response(HTTP_STATUS_404, "text/plain", not_found);
@@ -269,7 +270,6 @@ int start_server(char* path, bool cli_mode) {
             perror("send failed.\n");
             exit(EXIT_FAILURE);
         }
-        string_free(content);
         string_free(response);
 
         // Close the connection
