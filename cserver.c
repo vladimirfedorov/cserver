@@ -444,7 +444,9 @@ string make_response(char *http_status, const char *content_type, string content
     // Empty line to separate headers from the content
     strcat(response, "\r\n"); 
     // Content
-    strcat(response, content.value);
+    if (content.value) {
+        strcat(response, content.value);
+    }
 
     result.value = response;
     result.length = strlen(response);
