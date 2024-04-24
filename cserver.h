@@ -109,6 +109,17 @@ int start_server(char* path, bool cli_mode);
 int list_servers();
 
 /**
+ * Restarts a running instance of `cserver` with the provided PID
+ * 
+ * Parameters:
+ *  - id           Process ID
+ * 
+ * Returns EXIT_SUCCESS on successful execution; EXIT_FAILURE if the command
+ * execution fails.
+ */
+int restart_server(char *id);
+
+/**
  * Stops a running `cserver` service with the provided PID.
  * 
  * Parameters:

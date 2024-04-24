@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
         return start_server(argv[2], false);
     } else if (strcmp(argv[1], "list") == 0) {
         return list_servers();
+    } else if (argc == 3 && strcmp(argv[1], "restart") == 0) {
+        return restart_server(argv[2]);
     } else if (argc == 3 && strcmp(argv[1], "stop") == 0) {
         return stop_server(argv[2]);
     } else {
@@ -108,6 +110,7 @@ int print_help() {
     printf("  cserver run <path>    Run new server in console\n");
     printf("  cserver start <path>  Start new server at <path>\n");
     printf("  cserver list          List all servers\n");
+    printf("  cserver restart <id>  Restart server with <id>\n");
     printf("  cserver stop <id>     Stop server with <id>\n");
     printf("  cserver               Print this help\n");
     return EXIT_SUCCESS;
@@ -277,10 +280,35 @@ int start_server(char* path, bool cli_mode) {
     }
 }
 
+// WARNING: Refactor the code and store running servers in a file
+//          or get via IPC.
+int get_pid_path(pid_t pid, char *path) {
+    char command[256];
+    char line[MAX_PATH_LEN];    // Buffer for command output
+    char *last_arg = NULL;      // that should point to the last argument
+    snprintf(command, sizeof(command), "ps -p %d -o args", pid);
+    FILE *fp = popen(command, "r");
+    if (fp == NULL) return -1;
+
+    while (fgets(line, sizeof(line)-1, fp) != NULL) {
+        char *token = strtok(line, " ");
+        while (token != NULL) {
+            last_arg = token; // Keep updating last_arg until the end
+            token = strtok(NULL, " ");
+        }
+    }
+    if (last_arg == NULL) return -1;
+    strcpy(path, last_arg);
+    path[strcspn(path, "\n")] = 0;
+    return 0;
+}
+
 int list_servers() {
     FILE *fp;
     char result[1024];
-    fp = popen("pgrep cserver", "r");
+    char path[MAX_PATH_LEN];
+
+    fp = popen("pgrep ^cserver", "r");
     if (fp == NULL) {
         printf("Failed to run command\n" );
         exit(EXIT_FAILURE);
@@ -288,11 +316,32 @@ int list_servers() {
 
     printf("Running instances:\n");
     while (fgets(result, sizeof(result)-1, fp) != NULL) {
-        printf("%s", result);
+        int pid = atoi(result);
+        memset(path, 0, MAX_PATH_LEN);
+        get_pid_path(pid, path);
+        printf("%i %s\n", pid, path);
     }
 
     pclose(fp);
     return EXIT_SUCCESS;
+}
+
+int restart_server(char *id) {
+    int pid = atoi(id);
+    char path[MAX_PATH_LEN] = {0};
+    int ret = get_pid_path((pid_t)pid, path);
+    if (ret != 0) {
+        perror("Error restarting server");
+        exit(EXIT_FAILURE);
+    }
+    if (kill(pid, SIGTERM) == -1) {
+        perror("Error sending SIGTERM");
+        exit(EXIT_FAILURE);
+    }
+    waitpid(pid, NULL, 0);
+    
+    // This breaks the logics of get_pid_path
+    return start_server(path, false);
 }
 
 int stop_server(char *id) {
