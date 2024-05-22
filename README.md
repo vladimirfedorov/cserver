@@ -2,15 +2,15 @@
 
 [![Unit Tests](https://github.com/vladimirfedorov/cserver/actions/workflows/run-tests.yml/badge.svg)](https://github.com/vladimirfedorov/cserver/actions/workflows/run-tests.yml)
 
-The idea is to build a web server in C that:
+The idea is to build a web server in C with the following features:
 
-- [x] Serves static files from the `static` folder.
-- [x] Serves Markdown files, converting them to HTML files on the fly.
-- [ ] Categories based on pages metadata
-- [ ] Atom feeds
-- [ ] Runs Lua scripts.
+- [x] Serving static files from the `static` folder.
+- [x] Serving Markdown files and converting them to HTML on the fly.
+- [ ] Categorizing pages based on their metadata.
+- [ ] Generating Atom feeds.
+- [ ] Running Lua scripts.
 
-Ideally, the server should be able to serve static files in the `static` folder, transform Markdown files to HTML pages using templates in the `templates` folder, and create RSS feed(s) for categories in markdow files' header metadata. Each rendered page should be cached and kept cached until the server restarts or one of the website files changes.
+Ideally, the server should be able to serve static files in the `static` folder, transform Markdown files to HTML pages using templates in the `templates` folder, and create RSS feeds for categories based on Markdown files' header metadata. Each rendered page should be cached and kept cached until the server restarts or one of the website files changes.
 
 ### Make
 
