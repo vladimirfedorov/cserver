@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
         return start_server(argv[2], false);
     } else if (strcmp(argv[1], "list") == 0) {
         return list_servers();
+    } else if (argc == 3 && strcmp(argv[1], "restart") == 0) {
+        return restart_server(argv[2]);
     } else if (argc == 3 && strcmp(argv[1], "stop") == 0) {
         return stop_server(argv[2]);
     } else {
@@ -43,6 +45,20 @@ int main(int argc, char **argv) {
 #endif
 
 // String Functions ///////////////////////////////////////////////////////////
+
+// Trims string in place
+char * trim_whitespace(char *str) {
+    char *end;
+    // Leading spaces
+    while (isspace((unsigned char)*str)) str++;
+    if (*str == 0) return str; // end of line
+    // trailing spaces
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+    // new end of string
+    *(end+1) = 0;
+    return str;
+}
 
 string string_init() {
     return (string){ .value = NULL, .length = 0 };
@@ -107,6 +123,7 @@ int print_help() {
     printf("Usage: \n");
     printf("  cserver run <path>    Run new server in console\n");
     printf("  cserver start <path>  Start new server at <path>\n");
+    printf("  cserver restart <id>  Restart server at path\n");
     printf("  cserver list          List all servers\n");
     printf("  cserver stop <id>     Stop server with <id>\n");
     printf("  cserver               Print this help\n");
@@ -277,10 +294,61 @@ int start_server(char* path, bool cli_mode) {
     }
 }
 
+// WARNING: Refactor the code and store running servers in a file
+//          or get via IPC.
+int get_pid_path(pid_t pid, char *path) {
+    char command[256];
+    char line[MAX_PATH_LEN];    // Buffer for command output
+    char *last_arg = NULL;      // that should point to the last argument
+    snprintf(command, sizeof(command), "ps -p %d -o args", pid);
+    FILE *fp = popen(command, "r");
+    if (fp == NULL) return -1;
+
+    while (fgets(line, sizeof(line)-1, fp) != NULL) {
+        char *token = strtok(line, " ");
+        while (token != NULL) {
+            last_arg = token; // Keep updating last_arg until the end
+            token = strtok(NULL, " ");
+        }
+    }
+    if (last_arg == NULL) return -1;
+    strcpy(path, last_arg);
+    path[strcspn(path, "\n")] = 0;
+    return 0;
+}
+
+pid_t get_path_pid(char *path) {
+    FILE *fp;
+    char result[1024];
+    char server_path[MAX_PATH_LEN];
+
+    fp = popen("pgrep ^cserver", "r");
+    if (fp == NULL) {
+        printf("Failed to run command\n" );
+        exit(EXIT_FAILURE);
+    }
+
+    while (fgets(result, sizeof(result)-1, fp) != NULL) {
+        pid_t pid = atoi(result);
+        memset(server_path, 0, MAX_PATH_LEN);
+        if (get_pid_path(pid, server_path) == 0) {
+            if (strcmp(trim_whitespace(server_path), path) == 0) {
+                pclose(fp);
+                return pid;
+            }
+        }
+    }
+
+    pclose(fp);
+    return 0;
+}
+
 int list_servers() {
     FILE *fp;
     char result[1024];
-    fp = popen("pgrep cserver", "r");
+    char path[MAX_PATH_LEN];
+
+    fp = popen("pgrep ^cserver", "r");
     if (fp == NULL) {
         printf("Failed to run command\n" );
         exit(EXIT_FAILURE);
@@ -288,11 +356,29 @@ int list_servers() {
 
     printf("Running instances:\n");
     while (fgets(result, sizeof(result)-1, fp) != NULL) {
-        printf("%s", result);
+        int pid = atoi(result);
+        memset(path, 0, MAX_PATH_LEN);
+        get_pid_path(pid, path);
+        printf("%i %s\n", pid, path);
     }
 
     pclose(fp);
     return EXIT_SUCCESS;
+}
+
+int restart_server(char *path) {
+    pid_t pid = get_path_pid(path);
+    if (pid == 0) {
+        perror("Error: No running server found for the provided path");
+        exit(EXIT_FAILURE);
+    }
+    if (kill(pid, SIGTERM) == -1) {
+        perror("Error sending SIGTERM");
+        exit(EXIT_FAILURE);
+    }
+    waitpid(pid, NULL, 0);
+    
+    return start_server(path, false);
 }
 
 int stop_server(char *id) {
@@ -306,20 +392,6 @@ int stop_server(char *id) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-// Trims string in place
-char * trim_whitespace(char *str) {
-    char *end;
-    // Leading spaces
-    while (isspace((unsigned char)*str)) str++;
-    if (*str == 0) return str; // end of line
-    // trailing spaces
-    end = str + strlen(str) - 1;
-    while (end > str && isspace((unsigned char)*end)) end--;
-    // new end of string
-    *(end+1) = 0;
-    return str;
-}
 
 void store_metadata(char *key, char *value, char *filename, cJSON *metadata) {
     if (!cJSON_HasObjectItem(metadata, key)) {
