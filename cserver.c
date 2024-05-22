@@ -46,6 +46,20 @@ int main(int argc, char **argv) {
 
 // String Functions ///////////////////////////////////////////////////////////
 
+// Trims string in place
+char * trim_whitespace(char *str) {
+    char *end;
+    // Leading spaces
+    while (isspace((unsigned char)*str)) str++;
+    if (*str == 0) return str; // end of line
+    // trailing spaces
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+    // new end of string
+    *(end+1) = 0;
+    return str;
+}
+
 string string_init() {
     return (string){ .value = NULL, .length = 0 };
 }
@@ -109,8 +123,8 @@ int print_help() {
     printf("Usage: \n");
     printf("  cserver run <path>    Run new server in console\n");
     printf("  cserver start <path>  Start new server at <path>\n");
+    printf("  cserver restart <id>  Restart server at path\n");
     printf("  cserver list          List all servers\n");
-    printf("  cserver restart <id>  Restart server with <id>\n");
     printf("  cserver stop <id>     Stop server with <id>\n");
     printf("  cserver               Print this help\n");
     return EXIT_SUCCESS;
@@ -303,6 +317,32 @@ int get_pid_path(pid_t pid, char *path) {
     return 0;
 }
 
+pid_t get_path_pid(char *path) {
+    FILE *fp;
+    char result[1024];
+    char server_path[MAX_PATH_LEN];
+
+    fp = popen("pgrep ^cserver", "r");
+    if (fp == NULL) {
+        printf("Failed to run command\n" );
+        exit(EXIT_FAILURE);
+    }
+
+    while (fgets(result, sizeof(result)-1, fp) != NULL) {
+        pid_t pid = atoi(result);
+        memset(server_path, 0, MAX_PATH_LEN);
+        if (get_pid_path(pid, server_path) == 0) {
+            if (strcmp(trim_whitespace(server_path), path) == 0) {
+                pclose(fp);
+                return pid;
+            }
+        }
+    }
+
+    pclose(fp);
+    return 0;
+}
+
 int list_servers() {
     FILE *fp;
     char result[1024];
@@ -326,12 +366,10 @@ int list_servers() {
     return EXIT_SUCCESS;
 }
 
-int restart_server(char *id) {
-    int pid = atoi(id);
-    char path[MAX_PATH_LEN] = {0};
-    int ret = get_pid_path((pid_t)pid, path);
-    if (ret != 0) {
-        perror("Error restarting server");
+int restart_server(char *path) {
+    pid_t pid = get_path_pid(path);
+    if (pid == 0) {
+        perror("Error: No running server found for the provided path");
         exit(EXIT_FAILURE);
     }
     if (kill(pid, SIGTERM) == -1) {
@@ -340,7 +378,6 @@ int restart_server(char *id) {
     }
     waitpid(pid, NULL, 0);
     
-    // This breaks the logics of get_pid_path
     return start_server(path, false);
 }
 
@@ -355,20 +392,6 @@ int stop_server(char *id) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-// Trims string in place
-char * trim_whitespace(char *str) {
-    char *end;
-    // Leading spaces
-    while (isspace((unsigned char)*str)) str++;
-    if (*str == 0) return str; // end of line
-    // trailing spaces
-    end = str + strlen(str) - 1;
-    while (end > str && isspace((unsigned char)*end)) end--;
-    // new end of string
-    *(end+1) = 0;
-    return str;
-}
 
 void store_metadata(char *key, char *value, char *filename, cJSON *metadata) {
     if (!cJSON_HasObjectItem(metadata, key)) {
