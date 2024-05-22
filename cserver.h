@@ -23,6 +23,10 @@
 // 404 Not Found
 #define HTTP_STATUS_404 "404 Not Found"
 
+// Content Types
+extern const char *content_type_text;
+extern const char *content_type_html;
+extern const char *content_type_json;
 
 // Strings ////////////////////////////////////////////////////////////////////
 
