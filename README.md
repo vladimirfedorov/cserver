@@ -27,11 +27,13 @@ Ideally, the server should be able to serve static files in the `static` folder,
 
 ### Run
 
+You can run the server in CLI or debug mode. In this mode, the server will stay active in the terminal and will print all the output to the terminal.
+
 ```sh
 ./cserver run /path/to/files
 ```
 
---OR--
+Alternatively, you can run the server in service mode. In this mode, the server will keep running in the background.
 
 ```sh
 # start as a service
@@ -39,6 +41,9 @@ Ideally, the server should be able to serve static files in the `static` folder,
 
 # list running instances
 ./cserver list
+
+# restart an instance
+./cserver start /path/to/files
 
 # stop an instance
 ./cserver stop id
