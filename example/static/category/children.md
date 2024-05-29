@@ -1,3 +1,10 @@
 # Category children
 
-{{references}}
+{{#request.parent}}
+[Back](/{{request.parent}})
+{{/request.parent}}
+
+{{#references.pages}}
+- [{{title}}](/{{link}})
+{{/references.pages}}
+

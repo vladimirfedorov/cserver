@@ -835,12 +835,21 @@ void add_request(cJSON *context, char *method, char *request_path, char *resourc
     cJSON *request_resource_path = cJSON_CreateString(resource_path);
     cJSON_AddItemToObject(request, "resourcePath", request_resource_path);
 
-    // page name component    
-    char *last_slash = strrchr(request_path, '/');
+    // Extract the last and the one-but-last path components
+    char *path_copy = malloc(strlen(request_path));
+    strcpy(path_copy, request_path);
+    char *last_slash = strrchr(path_copy, '/');
     char *page = last_slash ? last_slash + 1 : request_path;  // Point to the component after the last slash
-    cJSON *request_page = cJSON_CreateString(page);
-    cJSON_AddItemToObject(request, "page", request_page);
-
+    cJSON_AddItemToObject(request, "page", cJSON_CreateString(page));
+    if (last_slash) {
+        *last_slash = '\0';
+        last_slash = strrchr(path_copy, '/');
+        if (last_slash) {
+            char *parent = last_slash + 1;
+            cJSON_AddItemToObject(request, "parent", cJSON_CreateString(parent));
+        }
+    }
+    free(path_copy);
     cJSON_AddItemToObject(context, "request", request);
 }
 
@@ -850,12 +859,6 @@ void add_references(cJSON *context) {
     cJSON *index = cJSON_GetObjectItem(site, "index");
     cJSON *references = cJSON_CreateObject();
 
-    if (!request) {
-        printf("request not found\n");
-    }
-    if (!index) {
-        printf("index not found\n");
-    }
     // Ensure all required objects exist
     if (!request || !index) {
         cJSON_AddItemToObject(context, "references", references);
