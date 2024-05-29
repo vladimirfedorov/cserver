@@ -23,8 +23,6 @@ const char *content_type_text = "text/plain";
 const char *content_type_html = "text/html";
 const char *content_type_json = "application/json";
 
-void collect_metadata_v2(char *path, cJSON *metadata);
-
 #ifndef CSERVER_TEST                // Exlude main from test target
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -589,106 +587,6 @@ void create_index(cJSON *metadata) {
     }
 
     cJSON_AddItemToObject(metadata, "index", index);
-}
-
-void store_metadata_v2(char *key, char *value, char *filename, cJSON *metadata) {
-    cJSON *meta_array;
-    char processed_name[256];
-    
-    if (!cJSON_HasObjectItem(metadata, key)) {
-        meta_array = cJSON_CreateArray();
-        cJSON_AddItemToObject(metadata, key, meta_array);
-    } else {
-        meta_array = cJSON_GetObjectItem(metadata, key);
-    }
-
-    to_lowercase_and_dash(processed_name, value);
-
-    cJSON *meta_item = NULL;
-    cJSON_ArrayForEach(meta_item, meta_array) {
-        if (strcmp(cJSON_GetObjectItem(meta_item, "name")->valuestring, processed_name) == 0) {
-            break;
-        }
-    }
-
-    if (meta_item == NULL) {
-        meta_item = cJSON_CreateObject();
-        cJSON_AddStringToObject(meta_item, "name", processed_name);
-        cJSON_AddStringToObject(meta_item, "title", value);
-        cJSON_AddItemToObject(meta_item, "pages", cJSON_CreateArray());
-        cJSON_AddItemToArray(meta_array, meta_item);
-    }
-
-    cJSON *pages = cJSON_GetObjectItem(meta_item, "pages");
-    cJSON *page_info = cJSON_CreateObject();
-    cJSON_AddStringToObject(page_info, "title", value);
-    cJSON_AddStringToObject(page_info, "link", filename);
-    cJSON_AddItemToArray(pages, page_info);
-}
-
-void process_file_v2(const char *filename, cJSON *metadata) {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        perror("Failed to open file");
-        return;
-    }
-
-    char line[1024];
-    int metadata_section = 0;
-    char current_title[256] = "";
-
-    while (fgets(line, sizeof(line), file)) {
-        if (strcmp(line, "---\n") == 0) {
-            metadata_section = !metadata_section;  // Toggle metadata section state
-            if (!metadata_section) {  // End of metadata section
-                break;
-            }
-        } else if (metadata_section) {
-            char *colon = strchr(line, ':');
-            if (colon) {
-                *colon = '\0';  // Split the string into key and value
-                char *key = line;
-                char *value = colon + 1;
-                key = trim_whitespace(key);
-                value = trim_whitespace(value);
-                if (strcmp(key, "title") == 0) {
-                    strcpy(current_title, value);
-                }
-                store_metadata_v2(key, value, (char *)filename, metadata);
-            }
-        }
-    }
-
-    fclose(file);
-}
-
-void collect_metadata_v2(char *path, cJSON *metadata) {
-    DIR *dir = opendir(path);
-    if (!dir) {
-        perror("Failed to open directory");
-        return;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_DIR) {
-            char next_path[1024];
-            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-                continue;
-
-            snprintf(next_path, sizeof(next_path), "%s/%s", path, entry->d_name);
-            collect_metadata_v2(next_path, metadata);  // Recursively call on subdirectory
-        } else if (entry->d_type == DT_REG) {
-            char *dot = strrchr(entry->d_name, '.');
-            if (dot && strcmp(dot, ".md") == 0) {
-                char filepath[1024];
-                snprintf(filepath, sizeof(filepath), "%s/%s", path, entry->d_name);
-                process_file_v2(filepath, metadata);
-            }
-        }
-    }
-
-    closedir(dir);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
