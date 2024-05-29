@@ -844,6 +844,58 @@ void add_request(cJSON *context, char *method, char *request_path, char *resourc
     cJSON_AddItemToObject(context, "request", request);
 }
 
+void add_references(cJSON *context) {
+    cJSON *request = cJSON_GetObjectItem(context, "request");
+    cJSON *site = cJSON_GetObjectItem(context, "site");
+    cJSON *index = cJSON_GetObjectItem(site, "index");
+    cJSON *references = cJSON_CreateObject();
+
+    if (!request) {
+        printf("request not found\n");
+    }
+    if (!index) {
+        printf("index not found\n");
+    }
+    // Ensure all required objects exist
+    if (!request || !index) {
+        cJSON_AddItemToObject(context, "references", references);
+        return;
+    }
+
+    // Get the parent and page from the request object
+    cJSON *parent_item = cJSON_GetObjectItem(request, "parent");
+    cJSON *page_item = cJSON_GetObjectItem(request, "page");
+
+    const char *parent = parent_item ? parent_item->valuestring : NULL;
+    const char *page = page_item ? page_item->valuestring : NULL;
+
+    // Case 1: If both parent and page exist in the request
+    if (parent && page) {
+        cJSON *metadata_array = cJSON_GetObjectItem(index, parent);
+        if (metadata_array) {
+            cJSON *metadata_item;
+            cJSON_ArrayForEach(metadata_item, metadata_array) {
+                cJSON *name_item = cJSON_GetObjectItem(metadata_item, "name");
+                if (name_item && strcmp(name_item->valuestring, page) == 0) {
+                    // Page matches an item within this category, add its pages to references
+                    cJSON *pages = cJSON_GetObjectItem(metadata_item, "pages");
+                    if (pages) {
+                        cJSON_AddItemToObject(references, "pages", cJSON_Duplicate(pages, 1));
+                    }
+                    break;
+                }
+            }
+        }
+    // Case 2: If only page exists in the request
+    } else if (page) {
+        cJSON *metadata_array = cJSON_GetObjectItem(index, page);
+        if (metadata_array) {
+            cJSON_AddItemToObject(references, page, cJSON_Duplicate(metadata_array, 1));
+        }
+    }
+
+    cJSON_AddItemToObject(context, "references", references);
+}
 int read_int(cJSON *object, char *name, int default_value) {
     cJSON *value_object = cJSON_GetObjectItem(object, name);
     if (value_object == NULL) return default_value;
@@ -863,6 +915,7 @@ string render_page(cJSON *context, char *path) {
         cJSON *page_metadata = cJSON_CreateObject();
         substring markdown_content = skip_metadata(file_content, page_metadata);
         cJSON_AddItemToObject(context, "page", page_metadata);
+        add_references(context);
         string md_expanded_content = render_mustache(markdown_content, context);
         string md_html_content = render_markdown(md_expanded_content);
         string_free(file_content);
