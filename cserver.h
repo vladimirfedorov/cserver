@@ -139,10 +139,20 @@ int stop_server(char *id);
  * cJSON object.
  * 
  * Parameters:
- *  - path         Root directory of the web server
+ *  - metadata     `cJSON` object to store metadata values to.
+ *  - base_path    Root directory of the web server
+ *  - path         current directory, NULL
+ */
+void collect_metadata(cJSON *metadata, char *base_path, char *path);
+
+/**
+ * Create website index data based on the provided `metadata`
+ * cJSON object.
+ * 
+ * Parameters:
  *  - metadata     `cJSON` object to store metadata values to.
  */
-void collect_metadata(char *path, cJSON *metadata);
+void create_index(cJSON *metadata);
 
 /**
  * Generates an HTTP response string.
