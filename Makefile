@@ -1,19 +1,19 @@
-FLAGS = 
+CFLAGS = -Wall
 
-objects = cserver.o md4c.o md4c-html.o entity.o cJSON.o mustach.o mustach-wrap.o mustach-cjson.o
+OBJECTS = cserver.o md4c.o md4c-html.o entity.o cJSON.o mustach.o mustach-wrap.o mustach-cjson.o
 
-cserver: $(objects)
-	cc $(FLAGS) -o cserver $(objects)
-	rm $(objects)
+cserver: $(OBJECTS)
+	cc $(CFLAGS) -o cserver $(OBJECTS)
+	rm $(OBJECTS)
 
-tests: FLAGS += -DCSERVER_TEST
-tests: $(objects) test-cserver.o
-	cc -DCSERVER_TEST -o tests/cserver-tests $(objects) test-cserver.o
-	rm $(objects)
+tests: CFLAGS += -DCSERVER_TEST
+tests: $(OBJECTS) test-cserver.o
+	cc -DCSERVER_TEST -o tests/cserver-tests $(OBJECTS) test-cserver.o
+	rm $(OBJECTS)
 
 cserver.o: cserver.c
 	clang -I. --analyze cserver.c
-	cc $(FLAGS) -Wall -I. -c cserver.c
+	cc $(CFLAGS) -I. -c cserver.c
 
 # md4c redefines OFF_MAX as (sizeof(OFF) == 8 ? UINT64_MAX : UINT32_MAX); macOS SDK definition is LLONG_MAX
 md4c.o: md4c/src/md4c.c
@@ -42,6 +42,6 @@ test-cserver.o: tests/test-cserver.c
 
 .PHONY: clean
 clean:
-	rm $(objects)
+	rm -f $(OBJECTS) test-cserver.o
 
 
