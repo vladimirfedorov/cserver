@@ -43,7 +43,7 @@ Alternatively, you can run the server in service mode. In this mode, the server 
 ./cserver list
 
 # restart an instance
-./cserver start /path/to/files
+./cserver restart /path/to/files
 
 # stop an instance
 ./cserver stop id
